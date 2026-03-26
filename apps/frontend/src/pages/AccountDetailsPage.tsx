@@ -110,9 +110,10 @@ export default function AccountDetailsPage() {
                             row.txn.nature === 'INCOME' ? 'bg-green-100 text-green-700' :
                             row.txn.nature === 'EXPENSE' ? 'bg-red-100 text-red-700' :
                             row.txn.nature === 'TRANSFER' ? 'bg-blue-100 text-blue-700' :
+                            row.txn.nature === 'LOAN_DISBURSEMENT' ? 'bg-purple-100 text-purple-700' :
                             'bg-orange-100 text-orange-700'
                           }`}>
-                            {row.txn.nature}
+                            {row.txn.nature === 'EMI_PAYMENT' ? 'EMI' : row.txn.nature === 'LOAN_DISBURSEMENT' ? 'LOAN' : row.txn.nature}
                           </span>
                           {row.txn.payment_method && (
                             <span className="text-xs text-gray-500">{row.txn.payment_method}</span>
@@ -233,6 +234,17 @@ function calculateStatement(
         // Show principal in debit column (loan reduces) and balance decreases
         debit = txn.principal_amount;
         runningBalance -= txn.principal_amount;
+      }
+    } else if (txn.nature === 'LOAN_DISBURSEMENT') {
+      // New loan disbursement
+      if (isSource) {
+        // Loan account (source) - debt increases
+        credit = txn.amount;
+        runningBalance += txn.amount;
+      } else if (isTarget) {
+        // Bank account (target) - money received
+        credit = txn.amount;
+        runningBalance += txn.amount;
       }
     }
 

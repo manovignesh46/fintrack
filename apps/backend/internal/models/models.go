@@ -14,10 +14,11 @@ const (
 	EntityHome     EntityType = "HOME"
 	EntityLoan     EntityType = "LOAN"
 
-	NatureIncome     TxNature = "INCOME"
-	NatureExpense    TxNature = "EXPENSE"
-	NatureTransfer   TxNature = "TRANSFER"
-	NatureEMIPayment TxNature = "EMI_PAYMENT"
+	NatureIncome           TxNature = "INCOME"
+	NatureExpense          TxNature = "EXPENSE"
+	NatureTransfer         TxNature = "TRANSFER"
+	NatureEMIPayment       TxNature = "EMI_PAYMENT"
+	NatureLoanDisbursement TxNature = "LOAN_DISBURSEMENT"
 )
 
 type Account struct {

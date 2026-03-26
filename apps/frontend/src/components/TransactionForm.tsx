@@ -57,7 +57,14 @@ export default function TransactionForm({ initial, onSubmit, submitLabel }: Prop
     categoriesApi.list(form.entity).then(setCategories).catch(() => {});
     // Reset category and sub-category when entity changes
     setSelectedCategoryId('');
-    setForm((f) => ({ ...f, sub_category_id: '' }));
+    setForm((f) => {
+      const updates: Partial<TransactionFormData> = { sub_category_id: '' };
+      // If switching to LOAN entity and current nature isn't valid, reset to EMI_PAYMENT
+      if (f.entity === 'LOAN' && f.nature !== 'EMI_PAYMENT' && f.nature !== 'LOAN_DISBURSEMENT') {
+        updates.nature = 'EMI_PAYMENT';
+      }
+      return { ...f, ...updates };
+    });
   }, [form.entity]);
 
   // Initialize selected category from initial sub_category_id
@@ -83,13 +90,13 @@ export default function TransactionForm({ initial, onSubmit, submitLabel }: Prop
 
   // Clear irrelevant fields when nature changes
   useEffect(() => {
-    if (form.nature === 'TRANSFER' || form.nature === 'EMI_PAYMENT') {
-      // Clear category/sub-category for TRANSFER and EMI_PAYMENT
+    if (form.nature === 'TRANSFER' || form.nature === 'EMI_PAYMENT' || form.nature === 'LOAN_DISBURSEMENT') {
+      // Clear category/sub-category for TRANSFER, EMI_PAYMENT, and LOAN_DISBURSEMENT
       setSelectedCategoryId('');
       setForm((f) => ({ ...f, sub_category_id: '' }));
     }
-    if (form.nature === 'INCOME' || form.nature === 'TRANSFER') {
-      // Clear payment method for INCOME and TRANSFER
+    if (form.nature === 'INCOME' || form.nature === 'TRANSFER' || form.nature === 'LOAN_DISBURSEMENT') {
+      // Clear payment method for INCOME, TRANSFER, and LOAN_DISBURSEMENT
       setForm((f) => ({ ...f, payment_method: '' }));
     }
   }, [form.nature]);
@@ -112,7 +119,12 @@ export default function TransactionForm({ initial, onSubmit, submitLabel }: Prop
 
   const assetAccounts = accounts.filter((a) => a.type === 'ASSET' && a.is_active);
   const liabilityAccounts = accounts.filter((a) => a.type === 'LIABILITY' && a.is_active);
-  const needsTarget = form.nature === 'TRANSFER' || form.nature === 'EMI_PAYMENT';
+  const needsTarget = form.nature === 'TRANSFER' || form.nature === 'EMI_PAYMENT' || form.nature === 'LOAN_DISBURSEMENT';
+
+  // Filter transaction types based on entity
+  const availableNatures = form.entity === 'LOAN'
+    ? NATURES.filter((n) => n === 'EMI_PAYMENT' || n === 'LOAN_DISBURSEMENT')
+    : NATURES;
 
   // Find selected category and its sub-categories
   const selectedCategory = categories.find((c) => c.id.toString() === selectedCategoryId);
@@ -151,7 +163,7 @@ export default function TransactionForm({ initial, onSubmit, submitLabel }: Prop
       <div>
         <label className="text-xs text-gray-500 mb-1 block">Transaction Type *</label>
         <div className="grid grid-cols-4 gap-1">
-          {NATURES.map((n) => (
+          {availableNatures.map((n) => (
             <button
               key={n}
               type="button"
@@ -160,7 +172,7 @@ export default function TransactionForm({ initial, onSubmit, submitLabel }: Prop
                 form.nature === n ? 'bg-blue-600 text-white' : 'bg-white border border-gray-300 text-gray-600'
               }`}
             >
-              {n === 'EMI_PAYMENT' ? 'EMI' : n}
+              {n === 'EMI_PAYMENT' ? 'EMI' : n === 'LOAN_DISBURSEMENT' ? 'LOAN' : n}
             </button>
           ))}
         </div>
@@ -229,15 +241,19 @@ export default function TransactionForm({ initial, onSubmit, submitLabel }: Prop
 
       {/* Source Account */}
       <div>
-        <label className="text-xs text-gray-500 mb-1 block">Source Account *</label>
+        <label className="text-xs text-gray-500 mb-1 block">
+          {form.nature === 'LOAN_DISBURSEMENT' ? 'Loan Account *' : 'Source Account *'}
+        </label>
         <select
           value={form.source_account_id}
           onChange={(e) => set('source_account_id', e.target.value)}
           required
           className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"
         >
-          <option value="">Select source account</option>
-          {assetAccounts.map((a) => (
+          <option value="">
+            {form.nature === 'LOAN_DISBURSEMENT' ? 'Select loan account' : 'Select source account'}
+          </option>
+          {(form.nature === 'LOAN_DISBURSEMENT' ? liabilityAccounts : assetAccounts).map((a) => (
             <option key={a.id} value={a.id}>
               {a.name} (₹{a.current_balance.toLocaleString('en-IN')})
             </option>
@@ -245,11 +261,11 @@ export default function TransactionForm({ initial, onSubmit, submitLabel }: Prop
         </select>
       </div>
 
-      {/* Target Account (for Transfer/EMI) */}
+      {/* Target Account (for Transfer/EMI/LOAN_DISBURSEMENT) */}
       {needsTarget && (
         <div>
           <label className="text-xs text-gray-500 mb-1 block">
-            {form.nature === 'EMI_PAYMENT' ? 'Loan Account *' : 'Target Account *'}
+            {form.nature === 'EMI_PAYMENT' ? 'Loan Account *' : form.nature === 'LOAN_DISBURSEMENT' ? 'Bank Account *' : 'Target Account *'}
           </label>
           <select
             value={form.target_account_id}
@@ -258,7 +274,7 @@ export default function TransactionForm({ initial, onSubmit, submitLabel }: Prop
             className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"
           >
             <option value="">
-              {form.nature === 'EMI_PAYMENT' ? 'Select loan account' : 'Select target account'}
+              {form.nature === 'EMI_PAYMENT' ? 'Select loan account' : form.nature === 'LOAN_DISBURSEMENT' ? 'Select bank account' : 'Select target account'}
             </option>
             {(form.nature === 'EMI_PAYMENT' ? liabilityAccounts : assetAccounts).map((a) => (
               <option key={a.id} value={a.id}>

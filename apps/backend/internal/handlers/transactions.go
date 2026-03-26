@@ -331,6 +331,17 @@ func applyBalanceChange(ctx context.Context, tx pgx.Tx, nature models.TxNature, 
 			return err
 		}
 		return nil
+	case models.NatureLoanDisbursement:
+		if targetID == nil {
+			return fmt.Errorf("target bank account required for loan disbursement")
+		}
+		// Source (loan) increases by amount (you owe more)
+		if _, err := tx.Exec(ctx, "UPDATE accounts SET current_balance = current_balance + $1 WHERE id = $2", amount, sourceID); err != nil {
+			return err
+		}
+		// Target (bank) receives the money
+		_, err := tx.Exec(ctx, "UPDATE accounts SET current_balance = current_balance + $1 WHERE id = $2", amount, *targetID)
+		return err
 	}
 	return fmt.Errorf("unknown nature: %s", nature)
 }
@@ -361,6 +372,16 @@ func reverseBalanceChange(ctx context.Context, tx pgx.Tx, nature models.TxNature
 			return err
 		}
 		return nil
+	case models.NatureLoanDisbursement:
+		// Reverse: decrease loan, decrease bank
+		if _, err := tx.Exec(ctx, "UPDATE accounts SET current_balance = current_balance - $1 WHERE id = $2", amount, sourceID); err != nil {
+			return err
+		}
+		if targetID != nil {
+			_, err := tx.Exec(ctx, "UPDATE accounts SET current_balance = current_balance - $1 WHERE id = $2", amount, *targetID)
+			return err
+		}
+		return nil
 	}
 	return nil
 }
@@ -384,12 +405,12 @@ func validateTransactionReq(req *models.CreateTransactionReq) error {
 	switch req.Nature {
 	case models.NatureIncome, models.NatureExpense:
 		// OK, no target needed
-	case models.NatureTransfer, models.NatureEMIPayment:
+	case models.NatureTransfer, models.NatureEMIPayment, models.NatureLoanDisbursement:
 		if req.TargetAccountID == nil || *req.TargetAccountID <= 0 {
 			return fmt.Errorf("target_account_id is required for %s", req.Nature)
 		}
 	default:
-		return fmt.Errorf("nature must be INCOME, EXPENSE, TRANSFER, or EMI_PAYMENT")
+		return fmt.Errorf("nature must be INCOME, EXPENSE, TRANSFER, EMI_PAYMENT, or LOAN_DISBURSEMENT")
 	}
 
 	if req.Nature == models.NatureEMIPayment {
