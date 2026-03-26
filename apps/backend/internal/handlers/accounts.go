@@ -20,9 +20,15 @@ func NewAccountHandler(db *pgxpool.Pool) *AccountHandler {
 }
 
 func (h *AccountHandler) List(w http.ResponseWriter, r *http.Request) {
+	userID, err := GetUserID(r)
+	if err != nil {
+		writeError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
 	rows, err := h.db.Query(r.Context(),
-		`SELECT id, name, type, initial_balance, current_balance, is_active, created_at
-		 FROM accounts ORDER BY type, name`)
+		`SELECT id, user_id, name, type, initial_balance, current_balance, is_active, created_at
+		 FROM accounts WHERE user_id = $1 ORDER BY type, name`, userID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to fetch accounts")
 		return
@@ -32,7 +38,7 @@ func (h *AccountHandler) List(w http.ResponseWriter, r *http.Request) {
 	var accounts []models.Account
 	for rows.Next() {
 		var a models.Account
-		if err := rows.Scan(&a.ID, &a.Name, &a.Type, &a.InitialBalance, &a.CurrentBalance, &a.IsActive, &a.CreatedAt); err != nil {
+		if err := rows.Scan(&a.ID, &a.UserID, &a.Name, &a.Type, &a.InitialBalance, &a.CurrentBalance, &a.IsActive, &a.CreatedAt); err != nil {
 			writeError(w, http.StatusInternalServerError, "Failed to scan account")
 			return
 		}
@@ -43,6 +49,12 @@ func (h *AccountHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AccountHandler) Get(w http.ResponseWriter, r *http.Request) {
+	userID, err := GetUserID(r)
+	if err != nil {
+		writeError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
 	id, err := strconv.Atoi(chi.URLParam(r, "id"))
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "Invalid account ID")
@@ -54,14 +66,14 @@ func (h *AccountHandler) Get(w http.ResponseWriter, r *http.Request) {
 	var a models.Account
 	var query string
 	var args []interface{}
-	args = append(args, id)
+	args = append(args, id, userID)
 
 	if dateTo != "" {
 		// Calculate current balance up to dateTo
 		query = `
 			WITH account_info AS (
-				SELECT id, name, type, initial_balance, is_active, created_at
-				FROM accounts WHERE id = $1
+				SELECT id, user_id, name, type, initial_balance, is_active, created_at
+				FROM accounts WHERE id = $1 AND user_id = $2
 			),
 			inflow AS (
 				SELECT COALESCE(SUM(
@@ -70,32 +82,32 @@ func (h *AccountHandler) Get(w http.ResponseWriter, r *http.Request) {
 						ELSE amount 
 					END), 0) as total
 				FROM transactions
-				WHERE target_account_id = $1 AND transaction_date <= $2
+				WHERE target_account_id = $1 AND user_id = $2 AND transaction_date <= $3
 			),
 			outflow AS (
 				SELECT COALESCE(SUM(amount), 0) as total
 				FROM transactions
-				WHERE source_account_id = $1 AND transaction_date <= $2
+				WHERE source_account_id = $1 AND user_id = $2 AND transaction_date <= $3
 			),
 			loan_reduction AS (
 				-- EMI Payments reduce loan balance via principal_amount
 				SELECT COALESCE(SUM(principal_amount), 0) as total
 				FROM transactions
-				WHERE target_account_id = $1 AND nature = 'EMI_PAYMENT' AND transaction_date <= $2
+				WHERE target_account_id = $1 AND nature = 'EMI_PAYMENT' AND user_id = $2 AND transaction_date <= $3
 			)
 			SELECT 
-				ai.id, ai.name, ai.type, ai.initial_balance,
+				ai.id, ai.user_id, ai.name, ai.type, ai.initial_balance,
 				ai.initial_balance + inflow.total - outflow.total - loan_reduction.total as current_balance,
 				ai.is_active, ai.created_at
 			FROM account_info ai, inflow, outflow, loan_reduction`
 		args = append(args, dateTo)
 	} else {
-		query = `SELECT id, name, type, initial_balance, current_balance, is_active, created_at
-		         FROM accounts WHERE id = $1`
+		query = `SELECT id, user_id, name, type, initial_balance, current_balance, is_active, created_at
+		         FROM accounts WHERE id = $1 AND user_id = $2`
 	}
 
 	err = h.db.QueryRow(r.Context(), query, args...).Scan(
-		&a.ID, &a.Name, &a.Type, &a.InitialBalance, &a.CurrentBalance, &a.IsActive, &a.CreatedAt)
+		&a.ID, &a.UserID, &a.Name, &a.Type, &a.InitialBalance, &a.CurrentBalance, &a.IsActive, &a.CreatedAt)
 	if err != nil {
 		writeError(w, http.StatusNotFound, "Account not found")
 		return
@@ -105,6 +117,12 @@ func (h *AccountHandler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AccountHandler) Create(w http.ResponseWriter, r *http.Request) {
+	userID, err := GetUserID(r)
+	if err != nil {
+		writeError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
 	var req models.CreateAccountReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "Invalid request body")
@@ -121,12 +139,12 @@ func (h *AccountHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var a models.Account
-	err := h.db.QueryRow(r.Context(),
-		`INSERT INTO accounts (name, type, initial_balance, current_balance)
-		 VALUES ($1, $2, $3, $3)
-		 RETURNING id, name, type, initial_balance, current_balance, is_active, created_at`,
-		req.Name, req.Type, req.InitialBalance).Scan(
-		&a.ID, &a.Name, &a.Type, &a.InitialBalance, &a.CurrentBalance, &a.IsActive, &a.CreatedAt)
+	err = h.db.QueryRow(r.Context(),
+		`INSERT INTO accounts (user_id, name, type, initial_balance, current_balance)
+		 VALUES ($1, $2, $3, $4, $4)
+		 RETURNING id, user_id, name, type, initial_balance, current_balance, is_active, created_at`,
+		userID, req.Name, req.Type, req.InitialBalance).Scan(
+		&a.ID, &a.UserID, &a.Name, &a.Type, &a.InitialBalance, &a.CurrentBalance, &a.IsActive, &a.CreatedAt)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to create account")
 		return
@@ -136,6 +154,12 @@ func (h *AccountHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AccountHandler) Update(w http.ResponseWriter, r *http.Request) {
+	userID, err := GetUserID(r)
+	if err != nil {
+		writeError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
 	id, err := strconv.Atoi(chi.URLParam(r, "id"))
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "Invalid account ID")
@@ -150,10 +174,10 @@ func (h *AccountHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	// Build dynamic update
 	if req.Name != nil {
-		_, err = h.db.Exec(r.Context(), "UPDATE accounts SET name = $1 WHERE id = $2", *req.Name, id)
+		_, err = h.db.Exec(r.Context(), "UPDATE accounts SET name = $1 WHERE id = $2 AND user_id = $3", *req.Name, id, userID)
 	}
 	if err == nil && req.IsActive != nil {
-		_, err = h.db.Exec(r.Context(), "UPDATE accounts SET is_active = $1 WHERE id = $2", *req.IsActive, id)
+		_, err = h.db.Exec(r.Context(), "UPDATE accounts SET is_active = $1 WHERE id = $2 AND user_id = $3", *req.IsActive, id, userID)
 	}
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to update account")
@@ -163,9 +187,9 @@ func (h *AccountHandler) Update(w http.ResponseWriter, r *http.Request) {
 	// Return updated account
 	var a models.Account
 	err = h.db.QueryRow(r.Context(),
-		`SELECT id, name, type, initial_balance, current_balance, is_active, created_at
-		 FROM accounts WHERE id = $1`, id).Scan(
-		&a.ID, &a.Name, &a.Type, &a.InitialBalance, &a.CurrentBalance, &a.IsActive, &a.CreatedAt)
+		`SELECT id, user_id, name, type, initial_balance, current_balance, is_active, created_at
+		 FROM accounts WHERE id = $1 AND user_id = $2`, id, userID).Scan(
+		&a.ID, &a.UserID, &a.Name, &a.Type, &a.InitialBalance, &a.CurrentBalance, &a.IsActive, &a.CreatedAt)
 	if err != nil {
 		writeError(w, http.StatusNotFound, "Account not found")
 		return

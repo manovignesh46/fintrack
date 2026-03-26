@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom';
 import TransactionsPage from './pages/TransactionsPage';
 import AddTransactionPage from './pages/AddTransactionPage';
 import AccountsPage from './pages/AccountsPage';
@@ -11,6 +11,8 @@ import TallyPage from './pages/TallyPage';
 import TemplatesPage from './pages/TemplatesPage';
 import CreateTemplatePage from './pages/CreateTemplatePage';
 import EditTransactionPage from './pages/EditTransactionPage';
+import LoginPage from './pages/LoginPage';
+import { AuthProvider, useAuth } from './context/AuthContext';
 
 const navItems = [
   { to: '/', label: 'Transactions', icon: '📋' },
@@ -20,32 +22,66 @@ const navItems = [
   { to: '/more', label: 'More', icon: '⋯' },
 ];
 
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, loading } = useAuth();
+  const location = useLocation();
+
+  if (loading) return <div>Loading...</div>;
+  if (!isAuthenticated) return <Navigate to="/login" state={{ from: location }} replace />;
+
+  return <>{children}</>;
+}
+
 export default function App() {
   return (
     <BrowserRouter>
-      <div className="min-h-screen bg-gray-50 pb-20">
-        <header className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-10">
-          <h1 className="text-lg font-bold text-gray-800">FinTrack</h1>
-        </header>
+      <AuthProvider>
+        <AppShell />
+      </AuthProvider>
+    </BrowserRouter>
+  );
+}
 
-        <main className="max-w-lg mx-auto px-4 py-4">
-          <Routes>
-            <Route path="/" element={<TransactionsPage />} />
-            <Route path="/add" element={<AddTransactionPage />} />
-            <Route path="/edit/:id" element={<EditTransactionPage />} />
-            <Route path="/accounts" element={<AccountsPage />} />
-            <Route path="/accounts/:id" element={<AccountDetailsPage />} />
-            <Route path="/categories" element={<CategoriesPage />} />
-            <Route path="/categories/new" element={<CreateCategoryPage />} />
-            <Route path="/categories/:catId/sub/new" element={<CreateSubCategoryPage />} />
-            <Route path="/summary" element={<SummaryPage />} />
-            <Route path="/tally" element={<TallyPage />} />
-            <Route path="/templates" element={<TemplatesPage />} />
-            <Route path="/templates/new" element={<CreateTemplatePage />} />
-            <Route path="/more" element={<MorePage />} />
-          </Routes>
-        </main>
+function AppShell() {
+  const { isAuthenticated, logout, user } = useAuth();
 
+  return (
+    <div className="min-h-screen bg-gray-50 pb-20">
+      <header className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-10 flex justify-between items-center">
+        <h1 className="text-lg font-bold text-gray-800">FinTrack</h1>
+        {isAuthenticated && (
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-gray-600">Hi, {user?.username}</span>
+            <button
+              onClick={logout}
+              className="text-sm text-red-600 hover:underline"
+            >
+              Logout
+            </button>
+          </div>
+        )}
+      </header>
+
+      <main className="max-w-lg mx-auto px-4 py-4">
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/" element={<ProtectedRoute><TransactionsPage /></ProtectedRoute>} />
+          <Route path="/add" element={<ProtectedRoute><AddTransactionPage /></ProtectedRoute>} />
+          <Route path="/edit/:id" element={<ProtectedRoute><EditTransactionPage /></ProtectedRoute>} />
+          <Route path="/accounts" element={<ProtectedRoute><AccountsPage /></ProtectedRoute>} />
+          <Route path="/accounts/:id" element={<ProtectedRoute><AccountDetailsPage /></ProtectedRoute>} />
+          <Route path="/categories" element={<ProtectedRoute><CategoriesPage /></ProtectedRoute>} />
+          <Route path="/categories/new" element={<ProtectedRoute><CreateCategoryPage /></ProtectedRoute>} />
+          <Route path="/categories/:catId/sub/new" element={<ProtectedRoute><CreateSubCategoryPage /></ProtectedRoute>} />
+          <Route path="/summary" element={<ProtectedRoute><SummaryPage /></ProtectedRoute>} />
+          <Route path="/tally" element={<ProtectedRoute><TallyPage /></ProtectedRoute>} />
+          <Route path="/templates" element={<ProtectedRoute><TemplatesPage /></ProtectedRoute>} />
+          <Route path="/templates/new" element={<ProtectedRoute><CreateTemplatePage /></ProtectedRoute>} />
+          <Route path="/more" element={<ProtectedRoute><MorePage /></ProtectedRoute>} />
+        </Routes>
+      </main>
+
+      {isAuthenticated && (
         <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-10">
           <div className="max-w-lg mx-auto flex justify-around">
             {navItems.map((item) => (
@@ -63,8 +99,8 @@ export default function App() {
             ))}
           </div>
         </nav>
-      </div>
-    </BrowserRouter>
+      )}
+    </div>
   );
 }
 

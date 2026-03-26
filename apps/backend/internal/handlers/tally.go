@@ -21,6 +21,12 @@ func NewTallyHandler(db *pgxpool.Pool) *TallyHandler {
 
 // GetTally returns the calculated balance for an account
 func (h *TallyHandler) GetTally(w http.ResponseWriter, r *http.Request) {
+	userID, err := GetUserID(r)
+	if err != nil {
+		writeError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
 	id, err := strconv.Atoi(chi.URLParam(r, "id"))
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "Invalid account ID")
@@ -30,7 +36,7 @@ func (h *TallyHandler) GetTally(w http.ResponseWriter, r *http.Request) {
 	var name string
 	var balance float64
 	err = h.db.QueryRow(r.Context(),
-		"SELECT name, current_balance FROM accounts WHERE id = $1", id).Scan(&name, &balance)
+		"SELECT name, current_balance FROM accounts WHERE id = $1 AND user_id = $2", id, userID).Scan(&name, &balance)
 	if err != nil {
 		writeError(w, http.StatusNotFound, "Account not found")
 		return
@@ -45,6 +51,12 @@ func (h *TallyHandler) GetTally(w http.ResponseWriter, r *http.Request) {
 
 // CheckTally compares actual vs calculated balance
 func (h *TallyHandler) CheckTally(w http.ResponseWriter, r *http.Request) {
+	userID, err := GetUserID(r)
+	if err != nil {
+		writeError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
 	id, err := strconv.Atoi(chi.URLParam(r, "id"))
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "Invalid account ID")
@@ -60,7 +72,7 @@ func (h *TallyHandler) CheckTally(w http.ResponseWriter, r *http.Request) {
 	var name string
 	var balance float64
 	err = h.db.QueryRow(r.Context(),
-		"SELECT name, current_balance FROM accounts WHERE id = $1", id).Scan(&name, &balance)
+		"SELECT name, current_balance FROM accounts WHERE id = $1 AND user_id = $2", id, userID).Scan(&name, &balance)
 	if err != nil {
 		writeError(w, http.StatusNotFound, "Account not found")
 		return
@@ -79,6 +91,12 @@ func (h *TallyHandler) CheckTally(w http.ResponseWriter, r *http.Request) {
 
 // Summary returns monthly totals grouped by entity
 func (h *TallyHandler) Summary(w http.ResponseWriter, r *http.Request) {
+	userID, err := GetUserID(r)
+	if err != nil {
+		writeError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
 	month := r.URL.Query().Get("month") // Format: 2026-03
 	if month == "" {
 		writeError(w, http.StatusBadRequest, "month query parameter is required (format: YYYY-MM)")
@@ -94,10 +112,10 @@ func (h *TallyHandler) Summary(w http.ResponseWriter, r *http.Request) {
 			COALESCE(SUM(CASE WHEN nature = 'EXPENSE' THEN amount ELSE 0 END), 0) as total_expense,
 			COALESCE(SUM(CASE WHEN nature = 'EMI_PAYMENT' THEN amount ELSE 0 END), 0) as total_emi
 		FROM transactions
-		WHERE transaction_date >= $1 AND transaction_date <= $2
+		WHERE user_id = $1 AND transaction_date >= $2 AND transaction_date <= $3
 		GROUP BY entity
 		ORDER BY entity`,
-		dateFrom, dateTo)
+		userID, dateFrom, dateTo)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to fetch summary")
 		return

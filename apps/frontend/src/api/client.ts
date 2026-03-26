@@ -5,16 +5,45 @@ import type {
   TransactionTemplate,
   TallyResponse,
   SummaryResponse,
+  AuthResponse,
+  LoginReq,
+  RegisterReq,
 } from './types';
 
 // Use environment variable for API URL in production, or /api in development (Vite proxy)
 const BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
+const getAuthHeader = () => {
+  const token = localStorage.getItem('fintrack_token');
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
+};
+
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...getAuthHeader(),
+  };
+
+  if (options?.headers) {
+    Object.assign(headers, options.headers);
+  }
+
   const res = await fetch(BASE + url, {
-    headers: { 'Content-Type': 'application/json' },
     ...options,
+    headers,
   });
+
+  if (res.status === 401) {
+    localStorage.removeItem('fintrack_token');
+    localStorage.removeItem('fintrack_user');
+    window.location.href = '/login';
+    throw new Error('Unauthorized');
+  }
+
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(err.error || 'Request failed');
@@ -22,6 +51,17 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
   if (res.status === 204) return undefined as T;
   return res.json();
 }
+
+// --- Auth ---
+export const authApi = {
+  login: (data: LoginReq) => request<AuthResponse>('/login', { method: 'POST', body: JSON.stringify(data) }),
+  register: (data: RegisterReq) => request<AuthResponse>('/register', { method: 'POST', body: JSON.stringify(data) }),
+  logout: () => {
+    localStorage.removeItem('fintrack_token');
+    localStorage.removeItem('fintrack_user');
+    window.location.href = '/login';
+  },
+};
 
 // --- Accounts ---
 export const accountsApi = {
@@ -81,9 +121,9 @@ export const transactionsApi = {
     return request<Transaction[]>(`/transactions${qs}`);
   },
   get: (id: number) => request<Transaction>(`/transactions/${id}`),
-  create: (data: Omit<Transaction, 'id' | 'created_at'>) =>
+  create: (data: Omit<Transaction, 'id' | 'created_at' | 'user_id'>) =>
     request<Transaction>('/transactions', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id: number, data: Omit<Transaction, 'id' | 'created_at'>) =>
+  update: (id: number, data: Omit<Transaction, 'id' | 'created_at' | 'user_id'>) =>
     request<Transaction>(`/transactions/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: number) =>
     request<void>(`/transactions/${id}`, { method: 'DELETE' }),
@@ -92,7 +132,7 @@ export const transactionsApi = {
 // --- Templates ---
 export const templatesApi = {
   list: () => request<TransactionTemplate[]>('/templates'),
-  create: (data: Omit<TransactionTemplate, 'id' | 'created_at'>) =>
+  create: (data: Omit<TransactionTemplate, 'id' | 'created_at' | 'user_id'>) =>
     request<TransactionTemplate>('/templates', { method: 'POST', body: JSON.stringify(data) }),
   delete: (id: number) =>
     request<void>(`/templates/${id}`, { method: 'DELETE' }),

@@ -62,46 +62,55 @@ func main() {
 
 	// API routes
 	r.Route("/api", func(r chi.Router) {
-		// Accounts
-		r.Route("/accounts", func(r chi.Router) {
-			r.Get("/", accountH.List)
-			r.Post("/", accountH.Create)
-			r.Get("/{id}", accountH.Get)
-			r.Put("/{id}", accountH.Update)
-		})
+		// Auth
+		r.Post("/login", accountH.Login)
+		r.Post("/register", accountH.Register)
 
-		// Categories & Sub-categories
-		r.Route("/categories", func(r chi.Router) {
-			r.Get("/", categoryH.List)
-			r.Post("/", categoryH.Create)
-			r.Put("/{id}", categoryH.Update)
-			r.Delete("/{id}", categoryH.Delete)
-			r.Post("/{id}/subcategories", categoryH.CreateSubCategory)
-			r.Put("/{id}/subcategories/{subId}", categoryH.UpdateSubCategory)
-			r.Delete("/{id}/subcategories/{subId}", categoryH.DeleteSubCategory)
-		})
+		// Protected routes
+		r.Group(func(r chi.Router) {
+			r.Use(accountH.AuthMiddleware)
 
-		// Transactions
-		r.Route("/transactions", func(r chi.Router) {
-			r.Get("/", transactionH.List)
-			r.Post("/", transactionH.Create)
-			r.Get("/{id}", transactionH.Get)
-			r.Put("/{id}", transactionH.Update)
-			r.Delete("/{id}", transactionH.Delete)
-		})
+			// Accounts
+			r.Route("/accounts", func(r chi.Router) {
+				r.Get("/", accountH.List)
+				r.Post("/", accountH.Create)
+				r.Get("/{id}", accountH.Get)
+				r.Put("/{id}", accountH.Update)
+			})
 
-		// Templates
-		r.Route("/templates", func(r chi.Router) {
-			r.Get("/", templateH.List)
-			r.Post("/", templateH.Create)
-			r.Delete("/{id}", templateH.Delete)
-			r.Post("/{id}/execute", templateH.Execute)
-		})
+			// Categories & Sub-categories
+			r.Route("/categories", func(r chi.Router) {
+				r.Get("/", categoryH.List)
+				r.Post("/", categoryH.Create)
+				r.Put("/{id}", categoryH.Update)
+				r.Delete("/{id}", categoryH.Delete)
+				r.Post("/{id}/subcategories", categoryH.CreateSubCategory)
+				r.Put("/{id}/subcategories/{subId}", categoryH.UpdateSubCategory)
+				r.Delete("/{id}/subcategories/{subId}", categoryH.DeleteSubCategory)
+			})
 
-		// Tally & Summary
-		r.Get("/tally/{id}", tallyH.GetTally)
-		r.Post("/tally/{id}", tallyH.CheckTally)
-		r.Get("/summary", tallyH.Summary)
+			// Transactions
+			r.Route("/transactions", func(r chi.Router) {
+				r.Get("/", transactionH.List)
+				r.Post("/", transactionH.Create)
+				r.Get("/{id}", transactionH.Get)
+				r.Put("/{id}", transactionH.Update)
+				r.Delete("/{id}", transactionH.Delete)
+			})
+
+			// Templates
+			r.Route("/templates", func(r chi.Router) {
+				r.Get("/", templateH.List)
+				r.Post("/", templateH.Create)
+				r.Delete("/{id}", templateH.Delete)
+				r.Post("/{id}/execute", templateH.Execute)
+			})
+
+			// Tally & Summary
+			r.Get("/tally/{id}", tallyH.GetTally)
+			r.Post("/tally/{id}", tallyH.CheckTally)
+			r.Get("/summary", tallyH.Summary)
+		})
 	})
 
 	port := os.Getenv("PORT")

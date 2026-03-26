@@ -2,8 +2,21 @@ export type AccountType = 'ASSET' | 'LIABILITY';
 export type EntityType = 'PERSONAL' | 'HOME' | 'LOAN';
 export type TxNature = 'INCOME' | 'EXPENSE' | 'TRANSFER' | 'EMI_PAYMENT' | 'LOAN_DISBURSEMENT';
 
+export interface User {
+  id: number;
+  username: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AuthResponse {
+  token: string;
+  user: User;
+}
+
 export interface Account {
   id: number;
+  user_id: number;
   name: string;
   type: AccountType;
   initial_balance: number;
@@ -14,6 +27,7 @@ export interface Account {
 
 export interface Category {
   id: number;
+  user_id: number;
   name: string;
   entity: EntityType;
   nature: TxNature;
@@ -24,12 +38,14 @@ export interface Category {
 export interface SubCategory {
   id: number;
   category_id: number;
+  user_id: number;
   name: string;
   created_at: string;
 }
 
 export interface Transaction {
   id: number;
+  user_id: number;
   title: string;
   amount: number;
   nature: TxNature;
@@ -47,6 +63,7 @@ export interface Transaction {
 
 export interface TransactionTemplate {
   id: number;
+  user_id: number;
   title: string;
   amount: number;
   nature: TxNature;
@@ -79,6 +96,16 @@ export interface EntitySummary {
 export interface SummaryResponse {
   month: string;
   entities: EntitySummary[];
+}
+
+export interface LoginReq {
+  username?: string;
+  password?: string;
+}
+
+export interface RegisterReq {
+  username?: string;
+  password?: string;
 }
 
 export const PAYMENT_METHODS = [

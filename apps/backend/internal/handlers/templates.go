@@ -21,10 +21,16 @@ func NewTemplateHandler(db *pgxpool.Pool) *TemplateHandler {
 }
 
 func (h *TemplateHandler) List(w http.ResponseWriter, r *http.Request) {
+	userID, err := GetUserID(r)
+	if err != nil {
+		writeError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
 	rows, err := h.db.Query(r.Context(),
-		`SELECT id, title, amount, nature, source_account_id, target_account_id,
+		`SELECT id, user_id, title, amount, nature, source_account_id, target_account_id,
 			sub_category_id, entity, payment_method, principal_amount, interest_amount, created_at
-		 FROM transaction_templates ORDER BY title`)
+		 FROM transaction_templates WHERE user_id = $1 ORDER BY title`, userID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to fetch templates")
 		return
@@ -35,7 +41,7 @@ func (h *TemplateHandler) List(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var t models.TransactionTemplate
 		var paymentMethod *string
-		if err := rows.Scan(&t.ID, &t.Title, &t.Amount, &t.Nature, &t.SourceAccountID,
+		if err := rows.Scan(&t.ID, &t.UserID, &t.Title, &t.Amount, &t.Nature, &t.SourceAccountID,
 			&t.TargetAccountID, &t.SubCategoryID, &t.Entity, &paymentMethod,
 			&t.PrincipalAmount, &t.InterestAmount, &t.CreatedAt); err != nil {
 			writeError(w, http.StatusInternalServerError, "Failed to scan template")
@@ -55,6 +61,12 @@ func (h *TemplateHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TemplateHandler) Create(w http.ResponseWriter, r *http.Request) {
+	userID, err := GetUserID(r)
+	if err != nil {
+		writeError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
 	var req models.CreateTemplateReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "Invalid request body")
@@ -68,16 +80,16 @@ func (h *TemplateHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	var t models.TransactionTemplate
 	var createPM *string
-	err := h.db.QueryRow(r.Context(),
-		`INSERT INTO transaction_templates (title, amount, nature, source_account_id,
+	err = h.db.QueryRow(r.Context(),
+		`INSERT INTO transaction_templates (user_id, title, amount, nature, source_account_id,
 			target_account_id, sub_category_id, entity, payment_method, principal_amount, interest_amount)
-		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-		 RETURNING id, title, amount, nature, source_account_id, target_account_id,
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+		 RETURNING id, user_id, title, amount, nature, source_account_id, target_account_id,
 			sub_category_id, entity, payment_method, principal_amount, interest_amount, created_at`,
-		req.Title, req.Amount, req.Nature, req.SourceAccountID, req.TargetAccountID,
+		userID, req.Title, req.Amount, req.Nature, req.SourceAccountID, req.TargetAccountID,
 		req.SubCategoryID, req.Entity, nilIfEmpty(req.PaymentMethod),
 		req.PrincipalAmount, req.InterestAmount).Scan(
-		&t.ID, &t.Title, &t.Amount, &t.Nature, &t.SourceAccountID,
+		&t.ID, &t.UserID, &t.Title, &t.Amount, &t.Nature, &t.SourceAccountID,
 		&t.TargetAccountID, &t.SubCategoryID, &t.Entity, &createPM,
 		&t.PrincipalAmount, &t.InterestAmount, &t.CreatedAt)
 	if err != nil {
@@ -92,13 +104,19 @@ func (h *TemplateHandler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *TemplateHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	userID, err := GetUserID(r)
+	if err != nil {
+		writeError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
 	id, err := strconv.Atoi(chi.URLParam(r, "id"))
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "Invalid template ID")
 		return
 	}
 
-	tag, err := h.db.Exec(r.Context(), "DELETE FROM transaction_templates WHERE id = $1", id)
+	tag, err := h.db.Exec(r.Context(), "DELETE FROM transaction_templates WHERE id = $1 AND user_id = $2", id, userID)
 	if err != nil || tag.RowsAffected() == 0 {
 		writeError(w, http.StatusNotFound, "Template not found")
 		return
@@ -109,6 +127,12 @@ func (h *TemplateHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
 // Execute creates a transaction from a template
 func (h *TemplateHandler) Execute(w http.ResponseWriter, r *http.Request) {
+	userID, err := GetUserID(r)
+	if err != nil {
+		writeError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
 	id, err := strconv.Atoi(chi.URLParam(r, "id"))
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "Invalid template ID")
@@ -119,10 +143,10 @@ func (h *TemplateHandler) Execute(w http.ResponseWriter, r *http.Request) {
 	var t models.TransactionTemplate
 	var execPM *string
 	err = h.db.QueryRow(r.Context(),
-		`SELECT id, title, amount, nature, source_account_id, target_account_id,
+		`SELECT id, user_id, title, amount, nature, source_account_id, target_account_id,
 			sub_category_id, entity, payment_method, principal_amount, interest_amount, created_at
-		 FROM transaction_templates WHERE id = $1`, id).Scan(
-		&t.ID, &t.Title, &t.Amount, &t.Nature, &t.SourceAccountID,
+		 FROM transaction_templates WHERE id = $1 AND user_id = $2`, id, userID).Scan(
+		&t.ID, &t.UserID, &t.Title, &t.Amount, &t.Nature, &t.SourceAccountID,
 		&t.TargetAccountID, &t.SubCategoryID, &t.Entity, &execPM,
 		&t.PrincipalAmount, &t.InterestAmount, &t.CreatedAt)
 	if err != nil {
@@ -173,7 +197,7 @@ func (h *TemplateHandler) Execute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := applyBalanceChange(r.Context(), dbTx, req.Nature, req.SourceAccountID, req.TargetAccountID, req.Amount, req.PrincipalAmount); err != nil {
+	if err := applyBalanceChange(r.Context(), dbTx, userID, req.Nature, req.SourceAccountID, req.TargetAccountID, req.Amount, req.PrincipalAmount); err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to update balances")
 		return
 	}

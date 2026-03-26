@@ -23,6 +23,7 @@ const (
 
 type Account struct {
 	ID             int         `json:"id"`
+	UserID         int         `json:"user_id"`
 	Name           string      `json:"name"`
 	Type           AccountType `json:"type"`
 	InitialBalance float64     `json:"initial_balance"`
@@ -33,6 +34,7 @@ type Account struct {
 
 type Category struct {
 	ID            int           `json:"id"`
+	UserID        int           `json:"user_id"`
 	Name          string        `json:"name"`
 	Entity        EntityType    `json:"entity"`
 	Nature        TxNature      `json:"nature"`
@@ -43,12 +45,14 @@ type Category struct {
 type SubCategory struct {
 	ID         int       `json:"id"`
 	CategoryID int       `json:"category_id"`
+	UserID     int       `json:"user_id"`
 	Name       string    `json:"name"`
 	CreatedAt  time.Time `json:"created_at"`
 }
 
 type Transaction struct {
 	ID              int        `json:"id"`
+	UserID          int        `json:"user_id"`
 	Title           string     `json:"title"`
 	Amount          float64    `json:"amount"`
 	Nature          TxNature   `json:"nature"`
@@ -66,6 +70,7 @@ type Transaction struct {
 
 type TransactionTemplate struct {
 	ID              int        `json:"id"`
+	UserID          int        `json:"user_id"`
 	Title           string     `json:"title"`
 	Amount          float64    `json:"amount"`
 	Nature          TxNature   `json:"nature"`
@@ -79,7 +84,30 @@ type TransactionTemplate struct {
 	CreatedAt       time.Time  `json:"created_at"`
 }
 
+type User struct {
+	ID           int       `json:"id"`
+	Username     string    `json:"username"`
+	PasswordHash string    `json:"-"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}
+
 // --- Request / Response DTOs ---
+
+type LoginReq struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+type RegisterReq struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
+type AuthRes struct {
+	Token string `json:"token"`
+	User  User   `json:"user"`
+}
 
 type CreateAccountReq struct {
 	Name           string      `json:"name"`

@@ -1,0 +1,142 @@
+package handlers
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"net/http"
+	"os"
+	"time"
+
+	"github.com/fintrack/backend/internal/models"
+	"github.com/golang-jwt/jwt/v5"
+	"golang.org/x/crypto/bcrypt"
+)
+
+var jwtKey = []byte(os.Getenv("JWT_SECRET"))
+
+func init() {
+	if len(jwtKey) == 0 {
+		jwtKey = []byte("fintrack-default-secret")
+	}
+}
+
+type Claims struct {
+	UserID   int    `json:"user_id"`
+	Username string `json:"username"`
+	jwt.RegisteredClaims
+}
+
+func (h *AccountHandler) AuthMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tokenString := r.Header.Get("Authorization")
+		if len(tokenString) > 7 && tokenString[:7] == "Bearer " {
+			tokenString = tokenString[7:]
+		} else {
+			writeError(w, http.StatusUnauthorized, "Authorization header required")
+			return
+		}
+
+		claims := &Claims{}
+		token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+			return jwtKey, nil
+		})
+
+		if err != nil || !token.Valid {
+			writeError(w, http.StatusUnauthorized, "Invalid token")
+			return
+		}
+
+		ctx := context.WithValue(r.Context(), userContextKey, claims)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+func (h *AccountHandler) Register(w http.ResponseWriter, r *http.Request) {
+	var req models.RegisterReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid request payload")
+		return
+	}
+
+	if req.Username == "" || req.Password == "" {
+		writeError(w, http.StatusBadRequest, "Username and password are required")
+		return
+	}
+
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to hash password")
+		return
+	}
+
+	user := models.User{
+		Username:     req.Username,
+		PasswordHash: string(hashedPassword),
+	}
+
+	query := `INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING id, created_at, updated_at`
+	err = h.db.QueryRow(r.Context(), query, user.Username, user.PasswordHash).
+		Scan(&user.ID, &user.CreatedAt, &user.UpdatedAt)
+	if err != nil {
+		writeError(w, http.StatusConflict, "Failed to create user (username might be taken)")
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, user)
+}
+
+func (h *AccountHandler) Login(w http.ResponseWriter, r *http.Request) {
+	var req models.LoginReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid request payload")
+		return
+	}
+
+	var user models.User
+	query := `SELECT id, username, password_hash, created_at, updated_at FROM users WHERE username = $1`
+	err := h.db.QueryRow(r.Context(), query, req.Username).
+		Scan(&user.ID, &user.Username, &user.PasswordHash, &user.CreatedAt, &user.UpdatedAt)
+	if err != nil {
+		writeError(w, http.StatusUnauthorized, "Invalid username or password")
+		return
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
+		writeError(w, http.StatusUnauthorized, "Invalid username or password")
+		return
+	}
+
+	expirationTime := time.Now().Add(72 * time.Hour)
+	claims := &Claims{
+		UserID:   user.ID,
+		Username: user.Username,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(expirationTime),
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	tokenString, err := token.SignedString(jwtKey)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to generate token")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, models.AuthRes{
+		Token: tokenString,
+		User:  user,
+	})
+}
+
+type contextKey string
+
+const userContextKey contextKey = "user"
+
+func GetUserID(r *http.Request) (int, error) {
+	claims, ok := r.Context().Value(userContextKey).(*Claims)
+	if !ok {
+		return 0, errors.New("user not found in context")
+	}
+	return claims.UserID, nil
+}
