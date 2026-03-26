@@ -1,0 +1,133 @@
+package handlers
+
+import (
+	"encoding/json"
+	"net/http"
+	"strconv"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/fintrack/backend/internal/models"
+)
+
+type AccountHandler struct {
+	db *pgxpool.Pool
+}
+
+func NewAccountHandler(db *pgxpool.Pool) *AccountHandler {
+	return &AccountHandler{db: db}
+}
+
+func (h *AccountHandler) List(w http.ResponseWriter, r *http.Request) {
+	rows, err := h.db.Query(r.Context(),
+		`SELECT id, name, type, initial_balance, current_balance, is_active, created_at
+		 FROM accounts ORDER BY type, name`)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to fetch accounts")
+		return
+	}
+	defer rows.Close()
+
+	var accounts []models.Account
+	for rows.Next() {
+		var a models.Account
+		if err := rows.Scan(&a.ID, &a.Name, &a.Type, &a.InitialBalance, &a.CurrentBalance, &a.IsActive, &a.CreatedAt); err != nil {
+			writeError(w, http.StatusInternalServerError, "Failed to scan account")
+			return
+		}
+		accounts = append(accounts, a)
+	}
+
+	writeJSON(w, http.StatusOK, accounts)
+}
+
+func (h *AccountHandler) Get(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(chi.URLParam(r, "id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid account ID")
+		return
+	}
+
+	var a models.Account
+	err = h.db.QueryRow(r.Context(),
+		`SELECT id, name, type, initial_balance, current_balance, is_active, created_at
+		 FROM accounts WHERE id = $1`, id).Scan(
+		&a.ID, &a.Name, &a.Type, &a.InitialBalance, &a.CurrentBalance, &a.IsActive, &a.CreatedAt)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "Account not found")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, a)
+}
+
+func (h *AccountHandler) Create(w http.ResponseWriter, r *http.Request) {
+	var req models.CreateAccountReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	if req.Name == "" {
+		writeError(w, http.StatusBadRequest, "Name is required")
+		return
+	}
+	if req.Type != models.AccountTypeAsset && req.Type != models.AccountTypeLiability {
+		writeError(w, http.StatusBadRequest, "Type must be ASSET or LIABILITY")
+		return
+	}
+
+	var a models.Account
+	err := h.db.QueryRow(r.Context(),
+		`INSERT INTO accounts (name, type, initial_balance, current_balance)
+		 VALUES ($1, $2, $3, $3)
+		 RETURNING id, name, type, initial_balance, current_balance, is_active, created_at`,
+		req.Name, req.Type, req.InitialBalance).Scan(
+		&a.ID, &a.Name, &a.Type, &a.InitialBalance, &a.CurrentBalance, &a.IsActive, &a.CreatedAt)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to create account")
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, a)
+}
+
+func (h *AccountHandler) Update(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(chi.URLParam(r, "id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid account ID")
+		return
+	}
+
+	var req models.UpdateAccountReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid request body")
+		return
+	}
+
+	// Build dynamic update
+	if req.Name != nil {
+		_, err = h.db.Exec(r.Context(), "UPDATE accounts SET name = $1 WHERE id = $2", *req.Name, id)
+	}
+	if err == nil && req.IsActive != nil {
+		_, err = h.db.Exec(r.Context(), "UPDATE accounts SET is_active = $1 WHERE id = $2", *req.IsActive, id)
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to update account")
+		return
+	}
+
+	// Return updated account
+	var a models.Account
+	err = h.db.QueryRow(r.Context(),
+		`SELECT id, name, type, initial_balance, current_balance, is_active, created_at
+		 FROM accounts WHERE id = $1`, id).Scan(
+		&a.ID, &a.Name, &a.Type, &a.InitialBalance, &a.CurrentBalance, &a.IsActive, &a.CreatedAt)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "Account not found")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, a)
+}
