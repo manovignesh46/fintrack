@@ -21,6 +21,7 @@ const natureLabels: Record<TxNature, string> = {
 export default function TransactionsPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [entity, setEntity] = useState<EntityType | ''>('');
+  const [month, setMonth] = useState<string>(new Date().toISOString().slice(0, 7)); // YYYY-MM
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
@@ -29,6 +30,16 @@ export default function TransactionsPage() {
     try {
       const params: Record<string, string> = {};
       if (entity) params.entity = entity;
+      
+      // Calculate date range for the selected month
+      const [year, monthNum] = month.split('-').map(Number);
+      const from = `${year}-${monthNum.toString().padStart(2, '0')}-01`;
+      const lastDay = new Date(year, monthNum, 0).getDate();
+      const to = `${year}-${monthNum.toString().padStart(2, '0')}-${lastDay.toString().padStart(2, '0')}`;
+      
+      params.date_from = from;
+      params.date_to = to;
+      
       const data = await transactionsApi.list(params);
       setTransactions(data);
     } catch {
@@ -38,7 +49,7 @@ export default function TransactionsPage() {
     }
   };
 
-  useEffect(() => { load(); }, [entity]);
+  useEffect(() => { load(); }, [entity, month]);
 
   const handleDelete = async (id: number) => {
     if (!confirm('Delete this transaction?')) return;
@@ -52,15 +63,26 @@ export default function TransactionsPage() {
 
   return (
     <div className="space-y-4">
+      {/* Header and Month filter */}
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-gray-800">Transactions</h2>
+        <input
+          type="month"
+          value={month}
+          onChange={(e) => setMonth(e.target.value)}
+          className="px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+        />
+      </div>
+
       {/* Entity filter */}
-      <div className="flex gap-2 overflow-x-auto">
+      <div className="flex gap-2 overflow-x-auto pb-1">
         <button
           onClick={() => setEntity('')}
           className={`px-3 py-1.5 rounded-full text-sm whitespace-nowrap ${
             entity === '' ? 'bg-blue-600 text-white' : 'bg-white border border-gray-300 text-gray-600'
           }`}
         >
-          All
+          All Entities
         </button>
         {ENTITIES.map((e) => (
           <button

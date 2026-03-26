@@ -25,7 +25,17 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
 // --- Accounts ---
 export const accountsApi = {
   list: () => request<Account[]>('/accounts'),
-  get: (id: number) => request<Account>(`/accounts/${id}`),
+  get: (id: number, params?: { date_before?: string; date_to?: string }) => {
+    let url = `/accounts/${id}`;
+    if (params) {
+      const search = new URLSearchParams();
+      if (params.date_before) search.set('date_before', params.date_before);
+      if (params.date_to) search.set('date_to', params.date_to);
+      const qs = search.toString();
+      if (qs) url += `?${qs}`;
+    }
+    return request<Account>(url);
+  },
   create: (data: { name: string; type: string; initial_balance: number }) =>
     request<Account>('/accounts', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: number, data: { name?: string; is_active?: boolean }) =>

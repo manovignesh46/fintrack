@@ -95,6 +95,14 @@ export default function TransactionForm({ initial, onSubmit, submitLabel }: Prop
     }
   }, [form.principal_amount, form.interest_amount, form.nature]);
 
+  // Auto-set payment method to 'Cash' if source is Cash(Hand)
+  useEffect(() => {
+    const sourceAccount = accounts.find(a => a.id.toString() === form.source_account_id);
+    if (sourceAccount && sourceAccount.name.toLowerCase().includes('cash')) {
+      setForm(f => ({ ...f, payment_method: 'Cash' }));
+    }
+  }, [form.source_account_id, accounts]);
+
   // Clear irrelevant fields when nature changes
   useEffect(() => {
     // Check if this nature change is actually a "reset" or part of the initial load from template/edit

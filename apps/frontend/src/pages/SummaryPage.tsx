@@ -3,25 +3,27 @@ import { summaryApi } from '../api/client';
 import type { SummaryResponse } from '../api/types';
 
 export default function SummaryPage() {
-  const now = new Date();
-  const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  const [month, setMonth] = useState(defaultMonth);
+  const [month, setMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
   const [data, setData] = useState<SummaryResponse | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const load = async () => {
-    setLoading(true);
-    try {
-      const res = await summaryApi.get(month);
-      setData(res);
-    } catch {
-      setData(null);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => { load(); }, [month]);
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      try {
+        const res = await summaryApi.get(month);
+        setData(res);
+      } catch {
+        setData(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [month]);
 
   return (
     <div className="space-y-4">
@@ -31,7 +33,7 @@ export default function SummaryPage() {
           type="month"
           value={month}
           onChange={(e) => setMonth(e.target.value)}
-          className="px-2 py-1.5 border border-gray-300 rounded text-sm outline-none"
+          className="px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
         />
       </div>
 

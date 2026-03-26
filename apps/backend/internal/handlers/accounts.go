@@ -49,10 +49,52 @@ func (h *AccountHandler) Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	dateTo := r.URL.Query().Get("date_to")
+
 	var a models.Account
-	err = h.db.QueryRow(r.Context(),
-		`SELECT id, name, type, initial_balance, current_balance, is_active, created_at
-		 FROM accounts WHERE id = $1`, id).Scan(
+	var query string
+	var args []interface{}
+	args = append(args, id)
+
+	if dateTo != "" {
+		// Calculate current balance up to dateTo
+		query = `
+			WITH account_info AS (
+				SELECT id, name, type, initial_balance, is_active, created_at
+				FROM accounts WHERE id = $1
+			),
+			inflow AS (
+				SELECT COALESCE(SUM(
+					CASE 
+						WHEN nature = 'EMI_PAYMENT' THEN 0 -- EMI into target is handled by principal_amount reduction
+						ELSE amount 
+					END), 0) as total
+				FROM transactions
+				WHERE target_account_id = $1 AND transaction_date <= $2
+			),
+			outflow AS (
+				SELECT COALESCE(SUM(amount), 0) as total
+				FROM transactions
+				WHERE source_account_id = $1 AND transaction_date <= $2
+			),
+			loan_reduction AS (
+				-- EMI Payments reduce loan balance via principal_amount
+				SELECT COALESCE(SUM(principal_amount), 0) as total
+				FROM transactions
+				WHERE target_account_id = $1 AND nature = 'EMI_PAYMENT' AND transaction_date <= $2
+			)
+			SELECT 
+				ai.id, ai.name, ai.type, ai.initial_balance,
+				ai.initial_balance + inflow.total - outflow.total - loan_reduction.total as current_balance,
+				ai.is_active, ai.created_at
+			FROM account_info ai, inflow, outflow, loan_reduction`
+		args = append(args, dateTo)
+	} else {
+		query = `SELECT id, name, type, initial_balance, current_balance, is_active, created_at
+		         FROM accounts WHERE id = $1`
+	}
+
+	err = h.db.QueryRow(r.Context(), query, args...).Scan(
 		&a.ID, &a.Name, &a.Type, &a.InitialBalance, &a.CurrentBalance, &a.IsActive, &a.CreatedAt)
 	if err != nil {
 		writeError(w, http.StatusNotFound, "Account not found")

@@ -7,8 +7,13 @@ export default function AccountDetailsPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [account, setAccount] = useState<Account | null>(null);
+  const [openingBalanceAccount, setOpeningBalanceAccount] = useState<Account | null>(null);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [month, setMonth] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  });
 
   useEffect(() => {
     if (!id) return;
@@ -16,11 +21,25 @@ export default function AccountDetailsPage() {
     const loadData = async () => {
       setLoading(true);
       try {
-        const [accountData, txnData] = await Promise.all([
-          accountsApi.get(parseInt(id)),
-          transactionsApi.list({ account_id: id }),
+        const [year, monthNum] = month.split('-').map(Number);
+        const dateFrom = new Date(year, monthNum - 1, 1).toISOString().split('T')[0];
+        const dateTo = new Date(year, monthNum, 0).toISOString().split('T')[0];
+        
+        // Previous day to get the balance as it was before this month started
+        const dayBeforeStart = new Date(year, monthNum - 1, 0).toISOString().split('T')[0];
+
+        const [accountCurr, accountAtStart, txnData] = await Promise.all([
+          accountsApi.get(parseInt(id), { date_to: dateTo }),
+          accountsApi.get(parseInt(id), { date_to: dayBeforeStart }),
+          transactionsApi.list({ 
+            account_id: id, 
+            date_from: dateFrom, 
+            date_to: dateTo,
+            per_page: 50 // Increase to show the whole month
+          }),
         ]);
-        setAccount(accountData);
+        setAccount(accountCurr);
+        setOpeningBalanceAccount(accountAtStart);
         setTransactions(txnData);
       } catch (err) {
         alert('Failed to load account details');
@@ -31,44 +50,67 @@ export default function AccountDetailsPage() {
     };
 
     loadData();
-  }, [id, navigate]);
+  }, [id, navigate, month]);
 
   if (loading) {
-    return <p className="text-gray-400 text-center py-8">Loading...</p>;
+    return (
+      <div className="space-y-4">
+        {/* Header placeholder */}
+        <div className="flex items-center gap-3">
+          <button onClick={() => navigate('/accounts')} className="text-gray-600 text-xl">←</button>
+          <div className="h-6 w-32 bg-gray-200 rounded animate-pulse"></div>
+        </div>
+        <p className="text-gray-400 text-center py-8">Loading...</p>
+      </div>
+    );
   }
 
-  if (!account) {
+  if (!account || !openingBalanceAccount) {
     return null;
   }
 
-  // Calculate running balance for each transaction
-  const statementRows = calculateStatement(transactions, account.initial_balance, account.id);
+  // Use the opening balance from openingBalanceAccount
+  const statementRows = calculateStatement(transactions, openingBalanceAccount.current_balance, account.id);
 
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <button
-          onClick={() => navigate('/accounts')}
-          className="text-gray-600 text-xl"
-        >
-          ←
-        </button>
-        <div className="flex-1">
-          <h2 className="text-lg font-semibold text-gray-800">{account.name}</h2>
-          <p className="text-sm text-gray-500">{account.type}</p>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => navigate('/accounts')}
+            className="text-gray-600 text-xl"
+          >
+            ←
+          </button>
+          <div>
+            <h2 className="text-lg font-semibold text-gray-800">{account.name}</h2>
+            <p className="text-sm text-gray-500">{account.type}</p>
+          </div>
         </div>
+        
+        <input
+          type="month"
+          value={month}
+          onChange={(e) => setMonth(e.target.value)}
+          className="px-2 py-1 border border-gray-300 rounded text-sm focus:ring-1 focus:ring-blue-500 outline-none"
+        />
       </div>
 
       {/* Current Balance Card */}
-      <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg p-4 text-white">
-        <p className="text-sm opacity-90">Current Balance</p>
-        <p className="text-3xl font-bold mt-1">
-          ₹{account.current_balance.toLocaleString('en-IN')}
-        </p>
-        <p className="text-xs opacity-75 mt-2">
-          Opening Balance: ₹{account.initial_balance.toLocaleString('en-IN')}
-        </p>
+      <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg p-4 text-white shadow-sm">
+        <div className="flex justify-between items-start">
+          <div>
+            <p className="text-xs opacity-90 uppercase font-semibold">Closing Balance ({new Date(month + '-01').toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })})</p>
+            <p className="text-3xl font-bold mt-1">
+              ₹{account.current_balance.toLocaleString('en-IN')}
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-xs opacity-80">Opening Balance</p>
+            <p className="text-lg font-semibold">₹{openingBalanceAccount.current_balance.toLocaleString('en-IN')}</p>
+          </div>
+        </div>
       </div>
 
       {/* Statement */}
@@ -154,12 +196,12 @@ export default function AccountDetailsPage() {
                 <tr className="border-t-2 border-blue-200 bg-blue-50">
                   <td className="px-3 py-2 text-gray-600">—</td>
                   <td className="px-3 py-2">
-                    <span className="font-medium text-gray-700">Opening Balance</span>
+                    <span className="font-medium text-gray-700 underline decoration-dotted">Balance Brought Forward</span>
                   </td>
                   <td className="px-3 py-2 text-right">—</td>
                   <td className="px-3 py-2 text-right">—</td>
                   <td className="px-3 py-2 text-right font-semibold text-gray-800">
-                    ₹{account.initial_balance.toLocaleString('en-IN')}
+                    ₹{openingBalanceAccount.current_balance.toLocaleString('en-IN')}
                   </td>
                 </tr>
               </tbody>
