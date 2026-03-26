@@ -14,8 +14,8 @@ export default function CategoriesPage() {
   const load = () => {
     setLoading(true);
     categoriesApi.list({ entity: selectedEntity, nature: selectedNature })
-      .then(setCategories)
-      .catch(() => {})
+      .then((data) => setCategories(data || []))
+      .catch(() => setCategories([]))
       .finally(() => setLoading(false));
   };
 

@@ -43,9 +43,9 @@ export default function TransactionsPage() {
       params.date_to = to;
       
       const data = await transactionsApi.list(params);
-      setTransactions(data);
+      setTransactions(data || []);
     } catch {
-      // silent
+      setTransactions([]);
     } finally {
       setLoading(false);
     }

@@ -15,7 +15,10 @@ export default function AccountsPage() {
 
   const load = () => {
     setLoading(true);
-    accountsApi.list().then(setAccounts).catch(() => {}).finally(() => setLoading(false));
+    accountsApi.list()
+      .then((data) => setAccounts(data || []))
+      .catch(() => setAccounts([]))
+      .finally(() => setLoading(false));
   };
 
   useEffect(() => { load(); }, []);
