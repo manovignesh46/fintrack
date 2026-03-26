@@ -9,6 +9,7 @@ const natureColors: Record<TxNature, string> = {
   EXPENSE: 'text-red-600',
   TRANSFER: 'text-blue-600',
   EMI_PAYMENT: 'text-orange-600',
+  LOAN_DISBURSEMENT: 'text-purple-600',
 };
 
 const natureLabels: Record<TxNature, string> = {
@@ -16,6 +17,7 @@ const natureLabels: Record<TxNature, string> = {
   EXPENSE: 'Expense',
   TRANSFER: 'Transfer',
   EMI_PAYMENT: 'EMI Payment',
+  LOAN_DISBURSEMENT: 'Loan Disbursement',
 };
 
 export default function TransactionsPage() {

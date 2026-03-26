@@ -35,7 +35,7 @@ export default function AccountDetailsPage() {
             account_id: id, 
             date_from: dateFrom, 
             date_to: dateTo,
-            per_page: 50 // Increase to show the whole month
+            per_page: "50" // Increase to show the whole month
           }),
         ]);
         setAccount(accountCurr);

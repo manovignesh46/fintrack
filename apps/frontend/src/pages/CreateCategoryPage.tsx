@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { categoriesApi } from '../api/client';
-import { ENTITIES, NATURES } from '../api/types';
+import { ENTITIES } from '../api/types';
 import type { EntityType, TxNature } from '../api/types';
 
 export default function CreateCategoryPage() {
