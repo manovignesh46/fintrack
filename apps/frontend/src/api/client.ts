@@ -7,7 +7,8 @@ import type {
   SummaryResponse,
 } from './types';
 
-const BASE = '/api';
+// Use environment variable for API URL in production, or /api in development (Vite proxy)
+const BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(BASE + url, {
