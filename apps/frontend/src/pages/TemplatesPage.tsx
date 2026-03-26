@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { templatesApi } from '../api/client';
 import type { TransactionTemplate } from '../api/types';
 
@@ -9,7 +10,7 @@ const natureLabels: Record<string, string> = {
 export default function TemplatesPage() {
   const [templates, setTemplates] = useState<TransactionTemplate[]>([]);
   const [loading, setLoading] = useState(true);
-  const [executing, setExecuting] = useState<number | null>(null);
+  const navigate = useNavigate();
 
   const load = () => {
     setLoading(true);
@@ -18,16 +19,24 @@ export default function TemplatesPage() {
 
   useEffect(() => { load(); }, []);
 
-  const handleExecute = async (id: number) => {
-    setExecuting(id);
-    try {
-      await templatesApi.execute(id);
-      alert('Transaction created successfully!');
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed');
-    } finally {
-      setExecuting(null);
-    }
+  const handleUse = (t: TransactionTemplate) => {
+    navigate('/add', {
+      state: {
+        template: {
+          title: t.title,
+          amount: t.amount.toString(),
+          nature: t.nature,
+          source_account_id: t.source_account_id.toString(),
+          target_account_id: t.target_account_id?.toString() || '',
+          sub_category_id: t.sub_category_id?.toString() || '',
+          entity: t.entity,
+          payment_method: t.payment_method || '',
+          principal_amount: t.principal_amount.toString(),
+          interest_amount: t.interest_amount.toString(),
+          transaction_date: new Date().toISOString().split('T')[0],
+        },
+      },
+    });
   };
 
   const handleDelete = async (id: number) => {
@@ -42,14 +51,13 @@ export default function TemplatesPage() {
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h2 className="text-lg font-semibold text-gray-800">Templates</h2>
-        <p className="text-xs text-gray-400">Add via transaction form</p>
       </div>
 
       {loading ? (
         <p className="text-gray-400 text-center py-8">Loading...</p>
       ) : templates.length === 0 ? (
         <p className="text-gray-400 text-center py-8">
-          No templates yet. Save a transaction as a template from the Add Transaction page.
+          No templates yet. Create one or save from the transaction form.
         </p>
       ) : (
         <div className="space-y-2">
@@ -65,11 +73,10 @@ export default function TemplatesPage() {
                 </div>
                 <div className="flex gap-2 ml-3">
                   <button
-                    onClick={() => handleExecute(t.id)}
-                    disabled={executing === t.id}
-                    className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs font-medium disabled:opacity-50"
+                    onClick={() => handleUse(t)}
+                    className="px-3 py-1.5 bg-blue-600 text-white rounded text-xs font-medium"
                   >
-                    {executing === t.id ? '...' : 'Use'}
+                    Use
                   </button>
                   <button
                     onClick={() => handleDelete(t.id)}
@@ -83,6 +90,15 @@ export default function TemplatesPage() {
           ))}
         </div>
       )}
+
+      {/* Floating Action Button for Creating Template */}
+      <button
+        onClick={() => navigate('/templates/new')}
+        className="fixed bottom-24 right-6 w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center text-3xl hover:bg-blue-700 transition-colors z-20"
+        aria-label="Create Template"
+      >
+        +
+      </button>
     </div>
   );
 }

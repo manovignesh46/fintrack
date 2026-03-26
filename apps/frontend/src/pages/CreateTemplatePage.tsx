@@ -1,38 +1,38 @@
-import { useNavigate, useLocation } from 'react-router-dom';
-import { transactionsApi } from '../api/client';
+import { useNavigate } from 'react-router-dom';
+import { templatesApi } from '../api/client';
 import TransactionForm, { type TransactionFormData } from '../components/TransactionForm';
 
-export default function AddTransactionPage() {
+export default function CreateTemplatePage() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const initialData = location.state?.template as TransactionFormData | undefined;
 
   const handleSubmit = async (form: TransactionFormData) => {
-    await transactionsApi.create({
+    await templatesApi.create({
       title: form.title,
-      amount: parseFloat(form.amount),
+      amount: parseFloat(form.amount) || 0,
       nature: form.nature,
       source_account_id: parseInt(form.source_account_id),
       target_account_id: form.target_account_id ? parseInt(form.target_account_id) : undefined,
       sub_category_id: form.sub_category_id ? parseInt(form.sub_category_id) : undefined,
       entity: form.entity,
       payment_method: form.payment_method || undefined,
-      notes: form.notes || undefined,
       principal_amount: parseFloat(form.principal_amount) || 0,
       interest_amount: parseFloat(form.interest_amount) || 0,
-      transaction_date: form.transaction_date,
     });
-    navigate('/');
+    navigate('/templates');
   };
 
   return (
     <div>
-      <h2 className="text-lg font-semibold text-gray-800 mb-4">Add Transaction</h2>
-      <TransactionForm 
-        initial={initialData}
-        onSubmit={handleSubmit} 
-        submitLabel="Add Transaction" 
-      />
+      <div className="flex items-center gap-3 mb-4">
+        <button
+          onClick={() => navigate('/templates')}
+          className="text-gray-600 text-xl"
+        >
+          ←
+        </button>
+        <h2 className="text-lg font-semibold text-gray-800">Create Template</h2>
+      </div>
+      <TransactionForm onSubmit={handleSubmit} submitLabel="Save Template" />
     </div>
   );
 }

@@ -55,9 +55,16 @@ export default function TransactionForm({ initial, onSubmit, submitLabel }: Prop
 
   useEffect(() => {
     categoriesApi.list(form.entity).then(setCategories).catch(() => {});
-    // Reset category and sub-category when entity changes
-    setSelectedCategoryId('');
+    // Reset category and sub-category ONLY if entity actually changes from what was in initial
+    // This allows pre-population of categories when using templates or editing
     setForm((f) => {
+      // If we have a sub_category_id but no selectedCategoryId yet (initial load), 
+      // don't clear it yet; let the other useEffect handle it.
+      if (initial?.sub_category_id === f.sub_category_id && f.sub_category_id !== '') {
+        return f;
+      }
+
+      setSelectedCategoryId('');
       const updates: Partial<TransactionFormData> = { sub_category_id: '' };
       // If switching to LOAN entity and current nature isn't valid, reset to EMI_PAYMENT
       if (f.entity === 'LOAN' && f.nature !== 'EMI_PAYMENT' && f.nature !== 'LOAN_DISBURSEMENT') {
@@ -90,6 +97,11 @@ export default function TransactionForm({ initial, onSubmit, submitLabel }: Prop
 
   // Clear irrelevant fields when nature changes
   useEffect(() => {
+    // Check if this nature change is actually a "reset" or part of the initial load from template/edit
+    if (initial?.nature === form.nature && initial?.sub_category_id === form.sub_category_id) {
+      return; 
+    }
+
     if (form.nature === 'TRANSFER' || form.nature === 'EMI_PAYMENT' || form.nature === 'LOAN_DISBURSEMENT') {
       // Clear category/sub-category for TRANSFER, EMI_PAYMENT, and LOAN_DISBURSEMENT
       setSelectedCategoryId('');

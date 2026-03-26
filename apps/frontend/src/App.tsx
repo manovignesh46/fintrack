@@ -7,11 +7,12 @@ import CategoriesPage from './pages/CategoriesPage';
 import SummaryPage from './pages/SummaryPage';
 import TallyPage from './pages/TallyPage';
 import TemplatesPage from './pages/TemplatesPage';
+import CreateTemplatePage from './pages/CreateTemplatePage';
 import EditTransactionPage from './pages/EditTransactionPage';
 
 const navItems = [
   { to: '/', label: 'Transactions', icon: '📋' },
-  { to: '/add', label: 'Add', icon: '➕' },
+  { to: '/templates', label: 'Templates', icon: '📝' },
   { to: '/accounts', label: 'Accounts', icon: '🏦' },
   { to: '/summary', label: 'Summary', icon: '📊' },
   { to: '/more', label: 'More', icon: '⋯' },
@@ -36,6 +37,7 @@ export default function App() {
             <Route path="/summary" element={<SummaryPage />} />
             <Route path="/tally" element={<TallyPage />} />
             <Route path="/templates" element={<TemplatesPage />} />
+            <Route path="/templates/new" element={<CreateTemplatePage />} />
             <Route path="/more" element={<MorePage />} />
           </Routes>
         </main>
