@@ -35,6 +35,7 @@ type Category struct {
 	ID            int           `json:"id"`
 	Name          string        `json:"name"`
 	Entity        EntityType    `json:"entity"`
+	Nature        TxNature      `json:"nature"`
 	CreatedAt     time.Time     `json:"created_at"`
 	SubCategories []SubCategory `json:"sub_categories,omitempty"`
 }
@@ -94,6 +95,7 @@ type UpdateAccountReq struct {
 type CreateCategoryReq struct {
 	Name   string     `json:"name"`
 	Entity EntityType `json:"entity"`
+	Nature TxNature   `json:"nature"`
 }
 
 type UpdateCategoryReq struct {

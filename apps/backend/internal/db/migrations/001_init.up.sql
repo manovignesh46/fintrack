@@ -15,13 +15,14 @@ CREATE TABLE accounts (
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
--- Categories scoped by entity
+-- Categories scoped by entity and nature (Income/Expense)
 CREATE TABLE categories (
     id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     entity entity_type NOT NULL,
+    nature tx_nature NOT NULL DEFAULT 'EXPENSE',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(name, entity)
+    UNIQUE(name, entity, nature)
 );
 
 -- Sub-categories under a category

@@ -54,7 +54,7 @@ export default function TransactionForm({ initial, onSubmit, submitLabel }: Prop
   }, []);
 
   useEffect(() => {
-    categoriesApi.list(form.entity).then(setCategories).catch(() => {});
+    categoriesApi.list({ entity: form.entity, nature: form.nature }).then(setCategories).catch(() => {});
     // Reset category and sub-category ONLY if entity actually changes from what was in initial
     // This allows pre-population of categories when using templates or editing
     setForm((f) => {

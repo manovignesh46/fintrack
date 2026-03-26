@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -21,14 +22,22 @@ func NewCategoryHandler(db *pgxpool.Pool) *CategoryHandler {
 
 func (h *CategoryHandler) List(w http.ResponseWriter, r *http.Request) {
 	entity := r.URL.Query().Get("entity")
+	nature := r.URL.Query().Get("nature")
 
 	categories := make([]models.Category, 0)
 
-	query := `SELECT id, name, entity, created_at FROM categories`
+	query := `SELECT id, name, entity, nature, created_at FROM categories WHERE 1=1`
 	var args []interface{}
+	argIdx := 1
 	if entity != "" {
-		query += ` WHERE entity = $1`
+		query += fmt.Sprintf(` AND entity = $%d`, argIdx)
 		args = append(args, entity)
+		argIdx++
+	}
+	if nature != "" {
+		query += fmt.Sprintf(` AND nature = $%d`, argIdx)
+		args = append(args, nature)
+		argIdx++
 	}
 	query += ` ORDER BY name`
 
@@ -41,7 +50,7 @@ func (h *CategoryHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	for rows.Next() {
 		var c models.Category
-		if err := rows.Scan(&c.ID, &c.Name, &c.Entity, &c.CreatedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.Name, &c.Entity, &c.Nature, &c.CreatedAt); err != nil {
 			writeError(w, http.StatusInternalServerError, "Failed to scan category")
 			return
 		}
@@ -84,12 +93,16 @@ func (h *CategoryHandler) Create(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "Entity must be PERSONAL, HOME, or LOAN")
 		return
 	}
+	if req.Nature != models.NatureIncome && req.Nature != models.NatureExpense {
+		writeError(w, http.StatusBadRequest, "Nature must be INCOME or EXPENSE")
+		return
+	}
 
 	var c models.Category
 	err := h.db.QueryRow(r.Context(),
-		`INSERT INTO categories (name, entity) VALUES ($1, $2)
-		 RETURNING id, name, entity, created_at`,
-		req.Name, req.Entity).Scan(&c.ID, &c.Name, &c.Entity, &c.CreatedAt)
+		`INSERT INTO categories (name, entity, nature) VALUES ($1, $2, $3)
+		 RETURNING id, name, entity, nature, created_at`,
+		req.Name, req.Entity, req.Nature).Scan(&c.ID, &c.Name, &c.Entity, &c.Nature, &c.CreatedAt)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to create category")
 		return
@@ -124,8 +137,8 @@ func (h *CategoryHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	var c models.Category
 	h.db.QueryRow(r.Context(),
-		`SELECT id, name, entity, created_at FROM categories WHERE id = $1`, id).Scan(
-		&c.ID, &c.Name, &c.Entity, &c.CreatedAt)
+		`SELECT id, name, entity, nature, created_at FROM categories WHERE id = $1`, id).Scan(
+		&c.ID, &c.Name, &c.Entity, &c.Nature, &c.CreatedAt)
 
 	writeJSON(w, http.StatusOK, c)
 }

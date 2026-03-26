@@ -16,6 +16,7 @@ export interface Category {
   id: number;
   name: string;
   entity: EntityType;
+  nature: TxNature;
   created_at: string;
   sub_categories?: SubCategory[];
 }

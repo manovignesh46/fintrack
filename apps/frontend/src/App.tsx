@@ -4,6 +4,8 @@ import AddTransactionPage from './pages/AddTransactionPage';
 import AccountsPage from './pages/AccountsPage';
 import AccountDetailsPage from './pages/AccountDetailsPage';
 import CategoriesPage from './pages/CategoriesPage';
+import CreateCategoryPage from './pages/CreateCategoryPage';
+import CreateSubCategoryPage from './pages/CreateSubCategoryPage';
 import SummaryPage from './pages/SummaryPage';
 import TallyPage from './pages/TallyPage';
 import TemplatesPage from './pages/TemplatesPage';
@@ -34,6 +36,8 @@ export default function App() {
             <Route path="/accounts" element={<AccountsPage />} />
             <Route path="/accounts/:id" element={<AccountDetailsPage />} />
             <Route path="/categories" element={<CategoriesPage />} />
+            <Route path="/categories/new" element={<CreateCategoryPage />} />
+            <Route path="/categories/:catId/sub/new" element={<CreateSubCategoryPage />} />
             <Route path="/summary" element={<SummaryPage />} />
             <Route path="/tally" element={<TallyPage />} />
             <Route path="/templates" element={<TemplatesPage />} />

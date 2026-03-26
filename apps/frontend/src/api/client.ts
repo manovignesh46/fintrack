@@ -44,9 +44,14 @@ export const accountsApi = {
 
 // --- Categories ---
 export const categoriesApi = {
-  list: (entity?: string) =>
-    request<Category[]>(`/categories${entity ? `?entity=${entity}` : ''}`),
-  create: (data: { name: string; entity: string }) =>
+  list: (params?: { entity?: string; nature?: string }) => {
+    const search = new URLSearchParams();
+    if (params?.entity) search.set('entity', params.entity);
+    if (params?.nature) search.set('nature', params.nature);
+    const qs = search.toString();
+    return request<Category[]>(`/categories${qs ? `?${qs}` : ''}`);
+  },
+  create: (data: { name: string; entity: string; nature: string }) =>
     request<Category>('/categories', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: number, data: { name: string }) =>
     request<Category>(`/categories/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
