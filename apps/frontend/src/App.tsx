@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom';
 import TransactionsPage from './pages/TransactionsPage';
 import AddTransactionPage from './pages/AddTransactionPage';
 import AccountsPage from './pages/AccountsPage';
+import AccountDetailsPage from './pages/AccountDetailsPage';
 import CategoriesPage from './pages/CategoriesPage';
 import SummaryPage from './pages/SummaryPage';
 import TallyPage from './pages/TallyPage';
@@ -30,6 +31,7 @@ export default function App() {
             <Route path="/add" element={<AddTransactionPage />} />
             <Route path="/edit/:id" element={<EditTransactionPage />} />
             <Route path="/accounts" element={<AccountsPage />} />
+            <Route path="/accounts/:id" element={<AccountDetailsPage />} />
             <Route path="/categories" element={<CategoriesPage />} />
             <Route path="/summary" element={<SummaryPage />} />
             <Route path="/tally" element={<TallyPage />} />

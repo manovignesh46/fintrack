@@ -1,0 +1,244 @@
+import { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { accountsApi, transactionsApi } from '../api/client';
+import type { Account, Transaction } from '../api/types';
+
+export default function AccountDetailsPage() {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const [account, setAccount] = useState<Account | null>(null);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!id) return;
+
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        const [accountData, txnData] = await Promise.all([
+          accountsApi.get(parseInt(id)),
+          transactionsApi.list({ account_id: id }),
+        ]);
+        setAccount(accountData);
+        setTransactions(txnData);
+      } catch (err) {
+        alert('Failed to load account details');
+        navigate('/accounts');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, [id, navigate]);
+
+  if (loading) {
+    return <p className="text-gray-400 text-center py-8">Loading...</p>;
+  }
+
+  if (!account) {
+    return null;
+  }
+
+  // Calculate running balance for each transaction
+  const statementRows = calculateStatement(transactions, account.initial_balance, account.id);
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <button
+          onClick={() => navigate('/accounts')}
+          className="text-gray-600 text-xl"
+        >
+          ←
+        </button>
+        <div className="flex-1">
+          <h2 className="text-lg font-semibold text-gray-800">{account.name}</h2>
+          <p className="text-sm text-gray-500">{account.type}</p>
+        </div>
+      </div>
+
+      {/* Current Balance Card */}
+      <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg p-4 text-white">
+        <p className="text-sm opacity-90">Current Balance</p>
+        <p className="text-3xl font-bold mt-1">
+          ₹{account.current_balance.toLocaleString('en-IN')}
+        </p>
+        <p className="text-xs opacity-75 mt-2">
+          Opening Balance: ₹{account.initial_balance.toLocaleString('en-IN')}
+        </p>
+      </div>
+
+      {/* Statement */}
+      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+          <h3 className="text-sm font-semibold text-gray-700">Account Statement</h3>
+        </div>
+
+        {statementRows.length === 0 ? (
+          <p className="text-center text-gray-400 py-8">No transactions found</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Date</th>
+                  <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Description</th>
+                  <th className="px-3 py-2 text-right text-xs font-semibold text-gray-600">Debit</th>
+                  <th className="px-3 py-2 text-right text-xs font-semibold text-gray-600">Credit</th>
+                  <th className="px-3 py-2 text-right text-xs font-semibold text-gray-600">Balance</th>
+                </tr>
+              </thead>
+              <tbody>
+                {/* Transactions */}
+                {statementRows.map((row) => (
+                  <tr key={row.txn.id} className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="px-3 py-2 text-gray-600 whitespace-nowrap">
+                      {new Date(row.txn.transaction_date).toLocaleDateString('en-IN', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                      })}
+                    </td>
+                    <td className="px-3 py-2">
+                      <div>
+                        <p className="font-medium text-gray-800">{row.txn.title}</p>
+                        <div className="flex gap-2 mt-0.5">
+                          <span className={`text-xs px-1.5 py-0.5 rounded ${
+                            row.txn.nature === 'INCOME' ? 'bg-green-100 text-green-700' :
+                            row.txn.nature === 'EXPENSE' ? 'bg-red-100 text-red-700' :
+                            row.txn.nature === 'TRANSFER' ? 'bg-blue-100 text-blue-700' :
+                            'bg-orange-100 text-orange-700'
+                          }`}>
+                            {row.txn.nature}
+                          </span>
+                          {row.txn.payment_method && (
+                            <span className="text-xs text-gray-500">{row.txn.payment_method}</span>
+                          )}
+                        </div>
+                        {row.txn.nature === 'EMI_PAYMENT' && row.txn.principal_amount > 0 && (
+                          <p className="text-xs text-gray-600 mt-1">
+                            Principal: ₹{row.txn.principal_amount.toLocaleString('en-IN')} | 
+                            Interest: ₹{row.txn.interest_amount.toLocaleString('en-IN')}
+                          </p>
+                        )}
+                        {row.txn.notes && (
+                          <p className="text-xs text-gray-500 mt-1">{row.txn.notes}</p>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-3 py-2 text-right whitespace-nowrap">
+                      {row.debit > 0 && (
+                        <span className="text-red-600 font-medium">
+                          ₹{row.debit.toLocaleString('en-IN')}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-right whitespace-nowrap">
+                      {row.credit > 0 && (
+                        <span className="text-green-600 font-medium">
+                          ₹{row.credit.toLocaleString('en-IN')}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-right font-semibold text-gray-800 whitespace-nowrap">
+                      ₹{row.balance.toLocaleString('en-IN')}
+                    </td>
+                  </tr>
+                ))}
+
+                {/* Opening Balance - at the bottom since transactions are newest first */}
+                <tr className="border-t-2 border-blue-200 bg-blue-50">
+                  <td className="px-3 py-2 text-gray-600">—</td>
+                  <td className="px-3 py-2">
+                    <span className="font-medium text-gray-700">Opening Balance</span>
+                  </td>
+                  <td className="px-3 py-2 text-right">—</td>
+                  <td className="px-3 py-2 text-right">—</td>
+                  <td className="px-3 py-2 text-right font-semibold text-gray-800">
+                    ₹{account.initial_balance.toLocaleString('en-IN')}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+interface StatementRow {
+  txn: Transaction;
+  debit: number;
+  credit: number;
+  balance: number;
+}
+
+function calculateStatement(
+  transactions: Transaction[],
+  initialBalance: number,
+  accountId: number
+): StatementRow[] {
+  if (transactions.length === 0) return [];
+
+  // Sort transactions by date (oldest first) for running balance calculation
+  const sorted = [...transactions].sort((a, b) => {
+    const dateCompare = a.transaction_date.localeCompare(b.transaction_date);
+    if (dateCompare !== 0) return dateCompare;
+    return a.id - b.id;
+  });
+
+  let runningBalance = initialBalance;
+  const rows: StatementRow[] = [];
+
+  for (const txn of sorted) {
+    let debit = 0;
+    let credit = 0;
+
+    const isSource = txn.source_account_id === accountId;
+    const isTarget = txn.target_account_id === accountId;
+
+    if (txn.nature === 'INCOME') {
+      // Money coming into the account
+      if (isSource || isTarget) {
+        credit = txn.amount;
+        runningBalance += txn.amount;
+      }
+    } else if (txn.nature === 'EXPENSE') {
+      // Money going out of the account
+      if (isSource) {
+        debit = txn.amount;
+        runningBalance -= txn.amount;
+      }
+    } else if (txn.nature === 'TRANSFER') {
+      // For transfers, check if we're source (money out) or target (money in)
+      if (isSource) {
+        debit = txn.amount;
+        runningBalance -= txn.amount;
+      } else if (isTarget) {
+        credit = txn.amount;
+        runningBalance += txn.amount;
+      }
+    } else if (txn.nature === 'EMI_PAYMENT') {
+      // EMI payment
+      if (isSource) {
+        // Paying from asset account - money out
+        debit = txn.amount;
+        runningBalance -= txn.amount;
+      } else if (isTarget) {
+        // Liability account receiving payment - principal reduces the loan
+        // Show principal in debit column (loan reduces) and balance decreases
+        debit = txn.principal_amount;
+        runningBalance -= txn.principal_amount;
+      }
+    }
+
+    rows.push({ txn, debit, credit, balance: runningBalance });
+  }
+
+  // Reverse to show newest first
+  return rows.reverse();
+}

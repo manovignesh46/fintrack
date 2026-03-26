@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { accountsApi } from '../api/client';
 import type { Account } from '../api/types';
 
 export default function AccountsPage() {
+  const navigate = useNavigate();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
@@ -42,6 +44,10 @@ export default function AccountsPage() {
     } catch {
       alert('Failed to update');
     }
+  };
+
+  const handleAccountClick = (account: Account) => {
+    navigate(`/accounts/${account.id}`);
   };
 
   if (loading) return <p className="text-gray-400 text-center py-8">Loading...</p>;
@@ -94,7 +100,12 @@ export default function AccountsPage() {
         <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Asset Accounts</h3>
         <div className="space-y-2">
           {assets.map((a) => (
-            <AccountCard key={a.id} account={a} onToggle={handleToggle} />
+            <AccountCard 
+              key={a.id} 
+              account={a} 
+              onToggle={handleToggle} 
+              onClick={handleAccountClick}
+            />
           ))}
         </div>
       </section>
@@ -104,7 +115,13 @@ export default function AccountsPage() {
         <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Loan Accounts</h3>
         <div className="space-y-2">
           {liabilities.map((a) => (
-            <AccountCard key={a.id} account={a} onToggle={handleToggle} colorClass="text-orange-600" />
+            <AccountCard 
+              key={a.id} 
+              account={a} 
+              onToggle={handleToggle} 
+              onClick={handleAccountClick}
+              colorClass="text-orange-600" 
+            />
           ))}
         </div>
       </section>
@@ -115,27 +132,52 @@ export default function AccountsPage() {
 function AccountCard({
   account,
   onToggle,
+  onClick,
   colorClass = 'text-green-600',
 }: {
   account: Account;
   onToggle: (a: Account) => void;
+  onClick: (a: Account) => void;
   colorClass?: string;
 }) {
   return (
-    <div className={`bg-white rounded-lg border border-gray-200 p-3 ${!account.is_active ? 'opacity-50' : ''}`}>
+    <div 
+      className={`bg-white rounded-lg border border-gray-200 p-3 cursor-pointer hover:border-blue-300 transition-colors ${!account.is_active ? 'opacity-50' : ''}`}
+      onClick={() => onClick(account)}
+    >
       <div className="flex justify-between items-center">
         <p className="font-medium text-gray-800 text-sm">{account.name}</p>
         <p className={`font-semibold ${colorClass}`}>
           ₹{account.current_balance.toLocaleString('en-IN')}
         </p>
       </div>
-      <div className="flex justify-between items-center mt-1">
+      <div className="flex justify-between items-center mt-2">
         <p className="text-xs text-gray-400">
           Opening: ₹{account.initial_balance.toLocaleString('en-IN')}
         </p>
-        <button onClick={() => onToggle(account)} className="text-xs text-gray-400">
-          {account.is_active ? 'Disable' : 'Enable'}
-        </button>
+        <label 
+          className="flex items-center gap-2 cursor-pointer"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <span className="text-xs text-gray-500">
+            {account.is_active ? 'Active' : 'Inactive'}
+          </span>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggle(account);
+            }}
+            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+              account.is_active ? 'bg-blue-600' : 'bg-gray-300'
+            }`}
+          >
+            <span
+              className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                account.is_active ? 'translate-x-5' : 'translate-x-1'
+              }`}
+            />
+          </button>
+        </label>
       </div>
     </div>
   );

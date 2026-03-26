@@ -320,11 +320,12 @@ func applyBalanceChange(ctx context.Context, tx pgx.Tx, nature models.TxNature, 
 		if targetID == nil {
 			return fmt.Errorf("target loan account required for EMI payment")
 		}
-		// Source (bank) decreases by total amount
+		// Source (bank) decreases by total amount (principal + interest)
 		if _, err := tx.Exec(ctx, "UPDATE accounts SET current_balance = current_balance - $1 WHERE id = $2", amount, sourceID); err != nil {
 			return err
 		}
-		// Target (loan) principal decreases by principal_amount only
+		// Target (loan) balance decreases by principal_amount only (interest is just a cost)
+		// Subtract principal from loan balance to reduce the amount owed
 		if principalAmount > 0 {
 			_, err := tx.Exec(ctx, "UPDATE accounts SET current_balance = current_balance - $1 WHERE id = $2", principalAmount, *targetID)
 			return err
