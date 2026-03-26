@@ -11,12 +11,18 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
+	"github.com/joho/godotenv"
 
 	"github.com/fintrack/backend/internal/db"
 	"github.com/fintrack/backend/internal/handlers"
 )
 
 func main() {
+	// Load .env file if it exists
+	if err := godotenv.Load(); err != nil {
+		log.Println("No .env file found, relying on environment variables")
+	}
+
 	ctx := context.Background()
 
 	// Connect to database
