@@ -11,10 +11,11 @@ export default function TallyPage() {
 
   useEffect(() => {
     accountsApi.list().then((a) => {
-      const assets = a.filter((acc) => acc.type === 'ASSET' && acc.is_active);
+      const list = a || [];
+      const assets = list.filter((acc) => acc.type === 'ASSET' && acc.is_active);
       setAccounts(assets);
       if (assets.length > 0) setSelectedId(assets[0].id);
-    }).catch(() => {});
+    }).catch(() => setAccounts([]));
   }, []);
 
   const handleCheck = async (e: React.FormEvent) => {

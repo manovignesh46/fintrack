@@ -50,11 +50,11 @@ export default function TransactionForm({ initial, onSubmit, submitLabel }: Prop
   const [error, setError] = useState('');
 
   useEffect(() => {
-    accountsApi.list().then(setAccounts).catch(() => {});
+    accountsApi.list().then((data) => setAccounts(data || [])).catch(() => setAccounts([]));
   }, []);
 
   useEffect(() => {
-    categoriesApi.list({ entity: form.entity, nature: form.nature }).then(setCategories).catch(() => {});
+    categoriesApi.list({ entity: form.entity, nature: form.nature }).then((data) => setCategories(data || [])).catch(() => setCategories([]));
     // Reset category and sub-category ONLY if entity actually changes from what was in initial
     // This allows pre-population of categories when using templates or editing
     setForm((f) => {
@@ -72,7 +72,7 @@ export default function TransactionForm({ initial, onSubmit, submitLabel }: Prop
       }
       return { ...f, ...updates };
     });
-  }, [form.entity]);
+  }, [form.entity, form.nature]);
 
   // Initialize selected category from initial sub_category_id
   useEffect(() => {

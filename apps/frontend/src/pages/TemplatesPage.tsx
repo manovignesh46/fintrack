@@ -14,7 +14,10 @@ export default function TemplatesPage() {
 
   const load = () => {
     setLoading(true);
-    templatesApi.list().then(setTemplates).catch(() => {}).finally(() => setLoading(false));
+    templatesApi.list()
+      .then((data) => setTemplates(data || []))
+      .catch(() => setTemplates([]))
+      .finally(() => setLoading(false));
   };
 
   useEffect(() => { load(); }, []);
