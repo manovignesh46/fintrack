@@ -100,6 +100,7 @@ func main() {
 			// Transactions
 			r.Route("/transactions", func(r chi.Router) {
 				r.Get("/", transactionH.List)
+				r.Get("/export/{format}", transactionH.Export)
 				r.Post("/", transactionH.Create)
 				r.Get("/{id}", transactionH.Get)
 				r.Put("/{id}", transactionH.Update)

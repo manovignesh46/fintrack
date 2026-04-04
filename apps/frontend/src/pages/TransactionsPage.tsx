@@ -25,6 +25,7 @@ export default function TransactionsPage() {
   const [entity, setEntity] = useState<EntityType | ''>('');
   const [month, setMonth] = useState<string>(new Date().toISOString().slice(0, 7)); // YYYY-MM
   const [loading, setLoading] = useState(true);
+  const [showExportOptions, setShowExportOptions] = useState(false);
   const navigate = useNavigate();
 
   const load = async () => {
@@ -63,17 +64,90 @@ export default function TransactionsPage() {
     }
   };
 
+  const handleExport = async (format: 'csv' | 'excel') => {
+    const params = new URLSearchParams();
+    if (entity) params.set('entity', entity);
+    const [year, monthNum] = month.split('-').map(Number);
+    const from = `${year}-${monthNum.toString().padStart(2, '0')}-01`;
+    const lastDay = new Date(year, monthNum, 0).getDate();
+    const to = `${year}-${monthNum.toString().padStart(2, '0')}-${lastDay.toString().padStart(2, '0')}`;
+    params.set('date_from', from);
+    params.set('date_to', to);
+
+    const token = localStorage.getItem('fintrack_token');
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api';
+    const url = `${baseUrl}/transactions/export/${format}?${params.toString()}`;
+
+    // Create a hidden link and click it to trigger download with auth token (if using token in URL or if browser handles it)
+    // Since we need to pass Authorization header, we'll fetch and create a blob
+    try {
+      const response = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (!response.ok) throw new Error('Export failed');
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.setAttribute('download', `transactions_${month}.${format === 'csv' ? 'csv' : 'xlsx'}`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (err) {
+      alert('Export failed');
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* Header and Month filter */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-gray-800">Transactions</h2>
-        <input
-          type="month"
-          value={month}
-          onChange={(e) => setMonth(e.target.value)}
-          className="px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-        />
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-gray-800">Transactions</h2>
+          <div className="flex items-center gap-2 relative">
+            <button
+              onClick={() => setShowExportOptions(!showExportOptions)}
+              className="text-xs px-3 py-1.5 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 flex items-center gap-1 font-medium transition-colors"
+            >
+              Export
+              <svg xmlns="http://www.w3.org/2000/svg" className={`h-3 w-3 transition-transform ${showExportOptions ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {showExportOptions && (
+              <div className="absolute top-full right-0 mt-1 w-32 bg-white border border-gray-200 rounded-lg shadow-lg z-30 overflow-hidden">
+                <button
+                  onClick={() => {
+                    handleExport('csv');
+                    setShowExportOptions(false);
+                  }}
+                  className="w-full text-left px-4 py-2 text-xs text-gray-700 hover:bg-gray-50 border-b border-gray-100"
+                >
+                  As CSV
+                </button>
+                <button
+                  onClick={() => {
+                    handleExport('excel');
+                    setShowExportOptions(false);
+                  }}
+                  className="w-full text-left px-4 py-2 text-xs text-gray-700 hover:bg-gray-50"
+                >
+                  As Excel
+                </button>
+              </div>
+            )}
+
+            <input
+              type="month"
+              value={month}
+              onChange={(e) => setMonth(e.target.value)}
+              className="px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+            />
+          </div>
+        </div>
       </div>
 
       {/* Entity filter */}

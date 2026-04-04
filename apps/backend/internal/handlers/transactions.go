@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/xuri/excelize/v2"
 
 	"github.com/fintrack/backend/internal/models"
 )
@@ -103,6 +105,185 @@ func (h *TransactionHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, transactions)
+}
+
+func (h *TransactionHandler) Export(w http.ResponseWriter, r *http.Request) {
+	userID, err := GetUserID(r)
+	if err != nil {
+		writeError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	format := chi.URLParam(r, "format")
+	q := r.URL.Query()
+
+	query := `SELECT t.id, t.user_id, t.title, t.amount, t.nature, t.source_account_id,
+		t.target_account_id, t.sub_category_id, t.entity, t.payment_method,
+		t.notes, t.principal_amount, t.interest_amount, t.transaction_date, t.created_at,
+		sa.name as source_account_name, ta.name as target_account_name, 
+		sc.name as sub_category_name, c.name as category_name
+		FROM transactions t
+		LEFT JOIN accounts sa ON t.source_account_id = sa.id
+		LEFT JOIN accounts ta ON t.target_account_id = ta.id
+		LEFT JOIN sub_categories sc ON t.sub_category_id = sc.id
+		LEFT JOIN categories c ON sc.category_id = c.id
+		WHERE t.user_id = $1`
+	args := []interface{}{userID}
+	argIdx := 2
+
+	if v := q.Get("entity"); v != "" {
+		query += fmt.Sprintf(" AND t.entity = $%d", argIdx)
+		args = append(args, v)
+		argIdx++
+	}
+	if v := q.Get("nature"); v != "" {
+		query += fmt.Sprintf(" AND t.nature = $%d", argIdx)
+		args = append(args, v)
+		argIdx++
+	}
+	if v := q.Get("account_id"); v != "" {
+		query += fmt.Sprintf(" AND (t.source_account_id = $%d OR t.target_account_id = $%d)", argIdx, argIdx)
+		args = append(args, v)
+		argIdx++
+	}
+	if v := q.Get("date_from"); v != "" {
+		query += fmt.Sprintf(" AND t.transaction_date >= $%d", argIdx)
+		args = append(args, v)
+		argIdx++
+	}
+	if v := q.Get("date_to"); v != "" {
+		query += fmt.Sprintf(" AND t.transaction_date <= $%d", argIdx)
+		args = append(args, v)
+		argIdx++
+	}
+
+	query += " ORDER BY t.transaction_date DESC, t.created_at DESC"
+
+	rows, err := h.db.Query(r.Context(), query, args...)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to fetch transactions for export")
+		return
+	}
+	defer rows.Close()
+
+	type ExportRow struct {
+		models.Transaction
+		SourceAccountName string
+		TargetAccountName *string
+		SubCategoryName   *string
+		CategoryName      *string
+	}
+
+	var data []ExportRow
+	for rows.Next() {
+		var er ExportRow
+		var paymentMethod, notes, targetName, subCatName, catName *string
+		var txDate time.Time
+		err := rows.Scan(&er.ID, &er.UserID, &er.Title, &er.Amount, &er.Nature, &er.SourceAccountID,
+			&er.TargetAccountID, &er.SubCategoryID, &er.Entity, &paymentMethod,
+			&notes, &er.PrincipalAmount, &er.InterestAmount, &txDate, &er.CreatedAt,
+			&er.SourceAccountName, &targetName, &subCatName, &catName)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "Failed to scan row")
+			return
+		}
+		if paymentMethod != nil {
+			er.PaymentMethod = *paymentMethod
+		}
+		if notes != nil {
+			er.Notes = *notes
+		}
+		er.TargetAccountName = targetName
+		er.SubCategoryName = subCatName
+		er.CategoryName = catName
+		er.TransactionDate = txDate.Format("2006-01-02")
+		data = append(data, er)
+	}
+
+	headers := []string{"Date", "Title", "Amount", "Nature", "Entity", "Source Account", "Target Account", "Category", "Sub Category", "Payment Method", "Notes"}
+
+	if format == "csv" {
+		w.Header().Set("Content-Type", "text/csv")
+		w.Header().Set("Content-Disposition", "attachment;filename=transactions.csv")
+		writer := csv.NewWriter(w)
+		writer.Write(headers)
+		for _, d := range data {
+			target := ""
+			if d.TargetAccountName != nil {
+				target = *d.TargetAccountName
+			}
+			cat := ""
+			if d.CategoryName != nil {
+				cat = *d.CategoryName
+			}
+			subCat := ""
+			if d.SubCategoryName != nil {
+				subCat = *d.SubCategoryName
+			}
+			writer.Write([]string{
+				d.TransactionDate,
+				d.Title,
+				fmt.Sprintf("%.2f", d.Amount),
+				string(d.Nature),
+				string(d.Entity),
+				d.SourceAccountName,
+				target,
+				cat,
+				subCat,
+				d.PaymentMethod,
+				d.Notes,
+			})
+		}
+		writer.Flush()
+		return
+	} else if format == "excel" {
+		f := excelize.NewFile()
+		sheet := "Transactions"
+		f.SetSheetName("Sheet1", sheet)
+
+		// Set headers
+		for i, h := range headers {
+			cell, _ := excelize.CoordinatesToCellName(i+1, 1)
+			f.SetCellValue(sheet, cell, h)
+		}
+
+		// Set data
+		for i, d := range data {
+			rowIdx := i + 2
+			target := ""
+			if d.TargetAccountName != nil {
+				target = *d.TargetAccountName
+			}
+			cat := ""
+			if d.CategoryName != nil {
+				cat = *d.CategoryName
+			}
+			subCat := ""
+			if d.SubCategoryName != nil {
+				subCat = *d.SubCategoryName
+			}
+			f.SetCellValue(sheet, fmt.Sprintf("A%d", rowIdx), d.TransactionDate)
+			f.SetCellValue(sheet, fmt.Sprintf("B%d", rowIdx), d.Title)
+			f.SetCellValue(sheet, fmt.Sprintf("C%d", rowIdx), d.Amount)
+			f.SetCellValue(sheet, fmt.Sprintf("D%d", rowIdx), string(d.Nature))
+			f.SetCellValue(sheet, fmt.Sprintf("E%d", rowIdx), string(d.Entity))
+			f.SetCellValue(sheet, fmt.Sprintf("F%d", rowIdx), d.SourceAccountName)
+			f.SetCellValue(sheet, fmt.Sprintf("G%d", rowIdx), target)
+			f.SetCellValue(sheet, fmt.Sprintf("H%d", rowIdx), cat)
+			f.SetCellValue(sheet, fmt.Sprintf("I%d", rowIdx), subCat)
+			f.SetCellValue(sheet, fmt.Sprintf("J%d", rowIdx), d.PaymentMethod)
+			f.SetCellValue(sheet, fmt.Sprintf("K%d", rowIdx), d.Notes)
+		}
+
+		w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+		w.Header().Set("Content-Disposition", "attachment;filename=transactions.xlsx")
+		if err := f.Write(w); err != nil {
+			writeError(w, http.StatusInternalServerError, "Failed to write excel file")
+		}
+		return
+	}
+
+	writeError(w, http.StatusBadRequest, "Invalid format")
 }
 
 func (h *TransactionHandler) Get(w http.ResponseWriter, r *http.Request) {
