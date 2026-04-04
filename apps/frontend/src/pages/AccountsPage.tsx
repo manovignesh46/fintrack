@@ -9,13 +9,13 @@ export default function AccountsPage() {
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [newName, setNewName] = useState('');
-  const [newType, setNewType] = useState<'ASSET' | 'LIABILITY'>('ASSET');
   const [newBalance, setNewBalance] = useState('0');
+  const [newInterestRate, setNewInterestRate] = useState('0');
   const [saving, setSaving] = useState(false);
 
   const load = () => {
     setLoading(true);
-    accountsApi.list()
+    accountsApi.list({ type: 'LIABILITY' })
       .then((data) => setAccounts(data || []))
       .catch(() => setAccounts([]))
       .finally(() => setLoading(false));
@@ -23,15 +23,14 @@ export default function AccountsPage() {
 
   useEffect(() => { load(); }, []);
 
-  const assets = accounts.filter((a) => a.type === 'ASSET');
   const liabilities = accounts.filter((a) => a.type === 'LIABILITY');
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     try {
-      await accountsApi.create({ name: newName, type: newType, initial_balance: parseFloat(newBalance) });
-      setNewName(''); setNewBalance('0'); setShowAdd(false);
+      await accountsApi.create({ name: newName, type: 'LIABILITY', initial_balance: parseFloat(newBalance), interest_rate: parseFloat(newInterestRate) || 0 });
+      setNewName(''); setNewBalance('0'); setNewInterestRate('0'); setShowAdd(false);
       load();
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Failed');
@@ -68,78 +67,76 @@ export default function AccountsPage() {
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h2 className="text-lg font-semibold text-gray-800">Accounts</h2>
-        <button
-          onClick={() => setShowAdd(!showAdd)}
-          className="text-sm text-blue-600 font-medium"
-        >
-          {showAdd ? 'Cancel' : '+ Add'}
-        </button>
+        <h2 className="text-lg font-semibold text-gray-800">Loan Accounts</h2>
       </div>
 
       {showAdd && (
         <form onSubmit={handleAdd} className="bg-white border border-gray-200 rounded-lg p-3 space-y-2">
           <input
-            type="text" placeholder="Account name" value={newName}
+            type="text" placeholder="Loan name (e.g. SBI Home Loan)" value={newName}
             onChange={(e) => setNewName(e.target.value)} required
             className="w-full px-3 py-2 border border-gray-300 rounded text-sm outline-none"
           />
-          <div className="grid grid-cols-2 gap-2">
-            <select
-              value={newType}
-              onChange={(e) => setNewType(e.target.value as 'ASSET' | 'LIABILITY')}
-              className="px-3 py-2 border border-gray-300 rounded text-sm bg-white outline-none"
-            >
-              <option value="ASSET">Asset</option>
-              <option value="LIABILITY">Liability</option>
-            </select>
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">Total Loan Amount (₹)</label>
             <input
-              type="number" step="0.01" placeholder="Opening balance" value={newBalance}
+              type="number" step="0.01" placeholder="e.g. 200000" value={newBalance}
               onChange={(e) => setNewBalance(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded text-sm outline-none"
+              className="w-full px-3 py-2 border border-gray-300 rounded text-sm outline-none"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">Interest Rate (% per year)</label>
+            <input
+              type="number" step="0.01" min="0" max="100" placeholder="e.g. 12.5" value={newInterestRate}
+              onChange={(e) => setNewInterestRate(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded text-sm outline-none"
             />
           </div>
           <button
             type="submit" disabled={saving}
             className="w-full py-2 bg-blue-600 text-white rounded text-sm font-medium disabled:opacity-50"
           >
-            {saving ? 'Adding...' : 'Add Account'}
+            {saving ? 'Adding...' : 'Add Loan Account'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowAdd(false)}
+            className="w-full py-2 border border-gray-300 text-gray-600 rounded text-sm font-medium"
+          >
+            Cancel
           </button>
         </form>
       )}
 
-      {/* Asset Accounts */}
+      {/* Loan Accounts */}
       <section>
-        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Asset Accounts</h3>
         <div className="space-y-2">
-          {assets.map((a) => (
-            <AccountCard 
-              key={a.id} 
-              account={a} 
-              onToggle={handleToggle} 
-              onDelete={handleDelete}
-              onClick={handleAccountClick}
-            />
-          ))}
+          {liabilities.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-4">No loan accounts yet.</p>
+          ) : (
+            liabilities.map((a) => (
+              <AccountCard
+                key={a.id}
+                account={a}
+                onToggle={handleToggle}
+                onDelete={handleDelete}
+                onClick={handleAccountClick}
+                colorClass="text-orange-600"
+              />
+            ))
+          )}
         </div>
       </section>
 
-      {/* Loan Accounts */}
-      <section>
-        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Loan Accounts</h3>
-        <div className="space-y-2">
-          {liabilities.map((a) => (
-            <AccountCard 
-              key={a.id} 
-              account={a} 
-              onToggle={handleToggle} 
-              onDelete={handleDelete}
-              onClick={handleAccountClick}
-              colorClass="text-orange-600" 
-            />
-          ))}
-        </div>
-      </section>
+      {/* Floating Action Button */}
+      <button
+        onClick={() => setShowAdd(true)}
+        className="fixed bottom-24 right-6 w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center text-3xl hover:bg-blue-700 transition-colors z-20"
+        aria-label="Add Loan Account"
+      >
+        +
+      </button>
     </div>
   );
 }
@@ -179,13 +176,20 @@ function AccountCard({
           </button>
         </div>
         <p className={`font-semibold ${colorClass}`}>
-          ₹{account.current_balance.toLocaleString('en-IN')}
+          Outstanding: ₹{account.current_balance.toLocaleString('en-IN')}
         </p>
       </div>
       <div className="flex justify-between items-center mt-2">
-        <p className="text-xs text-gray-400">
-          Opening: ₹{account.initial_balance.toLocaleString('en-IN')}
-        </p>
+        <div className="flex gap-3">
+          <p className="text-xs text-gray-400">
+            Total: ₹{account.initial_balance.toLocaleString('en-IN')}
+          </p>
+          {account.interest_rate > 0 && (
+            <p className="text-xs font-medium text-orange-500">
+              {account.interest_rate}% p.a.
+            </p>
+          )}
+        </div>
         <label 
           className="flex items-center gap-2 cursor-pointer"
           onClick={(e) => e.stopPropagation()}

@@ -129,6 +129,7 @@ export default function AccountDetailsPage() {
                   <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Date</th>
                   <th className="px-3 py-2 text-left text-xs font-semibold text-gray-600">Description</th>
                   <th className="px-3 py-2 text-right text-xs font-semibold text-gray-600">Debit</th>
+                  <th className="px-3 py-2 text-right text-xs font-semibold text-gray-600">Interest</th>
                   <th className="px-3 py-2 text-right text-xs font-semibold text-gray-600">Credit</th>
                   <th className="px-3 py-2 text-right text-xs font-semibold text-gray-600">Balance</th>
                 </tr>
@@ -161,12 +162,6 @@ export default function AccountDetailsPage() {
                             <span className="text-xs text-gray-500">{row.txn.payment_method}</span>
                           )}
                         </div>
-                        {row.txn.nature === 'EMI_PAYMENT' && row.txn.principal_amount > 0 && (
-                          <p className="text-xs text-gray-600 mt-1">
-                            Principal: ₹{row.txn.principal_amount.toLocaleString('en-IN')} | 
-                            Interest: ₹{row.txn.interest_amount.toLocaleString('en-IN')}
-                          </p>
-                        )}
                         {row.txn.notes && (
                           <p className="text-xs text-gray-500 mt-1">{row.txn.notes}</p>
                         )}
@@ -176,6 +171,13 @@ export default function AccountDetailsPage() {
                       {row.debit > 0 && (
                         <span className="text-red-600 font-medium">
                           ₹{row.debit.toLocaleString('en-IN')}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-right whitespace-nowrap">
+                      {row.interest > 0 && (
+                        <span className="text-orange-600 font-medium">
+                          ₹{row.interest.toLocaleString('en-IN')}
                         </span>
                       )}
                     </td>
@@ -200,6 +202,7 @@ export default function AccountDetailsPage() {
                   </td>
                   <td className="px-3 py-2 text-right">—</td>
                   <td className="px-3 py-2 text-right">—</td>
+                  <td className="px-3 py-2 text-right">—</td>
                   <td className="px-3 py-2 text-right font-semibold text-gray-800">
                     ₹{openingBalanceAccount.current_balance.toLocaleString('en-IN')}
                   </td>
@@ -217,6 +220,7 @@ interface StatementRow {
   txn: Transaction;
   debit: number;
   credit: number;
+  interest: number;
   balance: number;
 }
 
@@ -240,6 +244,7 @@ function calculateStatement(
   for (const txn of sorted) {
     let debit = 0;
     let credit = 0;
+    let interest = 0;
 
     const isSource = txn.source_account_id === accountId;
     const isTarget = txn.target_account_id === accountId;
@@ -275,6 +280,7 @@ function calculateStatement(
         // Liability account receiving payment - principal reduces the loan
         // Show principal in debit column (loan reduces) and balance decreases
         debit = txn.principal_amount;
+        interest = txn.interest_amount;
         runningBalance -= txn.principal_amount;
       }
     } else if (txn.nature === 'LOAN_DISBURSEMENT') {
@@ -290,7 +296,7 @@ function calculateStatement(
       }
     }
 
-    rows.push({ txn, debit, credit, balance: runningBalance });
+    rows.push({ txn, debit, credit, interest, balance: runningBalance });
   }
 
   // Reverse to show newest first

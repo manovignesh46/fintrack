@@ -65,7 +65,10 @@ export const authApi = {
 
 // --- Accounts ---
 export const accountsApi = {
-  list: () => request<Account[]>('/accounts'),
+  list: (params?: { type?: 'ASSET' | 'LIABILITY' }) => {
+    const qs = params?.type ? `?type=${params.type}` : '';
+    return request<Account[]>(`/accounts${qs}`);
+  },
   get: (id: number, params?: { date_before?: string; date_to?: string }) => {
     let url = `/accounts/${id}`;
     if (params) {
@@ -77,7 +80,7 @@ export const accountsApi = {
     }
     return request<Account>(url);
   },
-  create: (data: { name: string; type: string; initial_balance: number }) =>
+  create: (data: { name: string; type: string; initial_balance: number; interest_rate: number }) =>
     request<Account>('/accounts', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: number, data: { name?: string; is_active?: boolean }) =>
     request<Account>(`/accounts/${id}`, { method: 'PUT', body: JSON.stringify(data) }),

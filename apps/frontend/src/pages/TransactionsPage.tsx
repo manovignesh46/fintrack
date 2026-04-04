@@ -9,7 +9,7 @@ const natureColors: Record<TxNature, string> = {
   EXPENSE: 'text-red-600',
   TRANSFER: 'text-blue-600',
   EMI_PAYMENT: 'text-orange-600',
-  LOAN_DISBURSEMENT: 'text-purple-600',
+  LOAN_DISBURSEMENT: 'text-green-800',
 };
 
 const natureLabels: Record<TxNature, string> = {
@@ -200,7 +200,7 @@ export default function TransactionsPage() {
                 </div>
                 <div className="text-right ml-3">
                   <p className={`font-semibold ${natureColors[t.nature]}`}>
-                    {t.nature === 'INCOME' ? '+' : '-'}₹{t.amount.toLocaleString('en-IN')}
+                    {(t.nature === 'INCOME' || t.nature === 'LOAN_DISBURSEMENT') ? '+' : '-'}₹{t.amount.toLocaleString('en-IN')}
                   </p>
                   <div className="flex gap-1 mt-1 justify-end">
                     <button

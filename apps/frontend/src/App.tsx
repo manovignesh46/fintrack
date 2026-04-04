@@ -17,7 +17,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 const navItems = [
   { to: '/', label: 'Transactions', icon: '📋' },
   { to: '/templates', label: 'Templates', icon: '📝' },
-  { to: '/accounts', label: 'Accounts', icon: '🏦' },
+  { to: '/accounts', label: 'Loans', icon: '🏦' },
   { to: '/summary', label: 'Summary', icon: '📊' },
   { to: '/more', label: 'More', icon: '⋯' },
 ];

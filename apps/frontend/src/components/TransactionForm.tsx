@@ -22,7 +22,7 @@ const emptyForm = (): TransactionFormData => ({
   title: '',
   amount: '',
   nature: 'EXPENSE',
-  source_account_id: '',
+  source_account_id: '1',
   target_account_id: '',
   sub_category_id: '',
   entity: 'PERSONAL',
@@ -50,7 +50,7 @@ export default function TransactionForm({ initial, onSubmit, submitLabel }: Prop
   const [error, setError] = useState('');
 
   useEffect(() => {
-    accountsApi.list().then((data) => setAccounts(data || [])).catch(() => setAccounts([]));
+    accountsApi.list({ type: 'LIABILITY' }).then((data) => setAccounts(data || [])).catch(() => setAccounts([]));
   }, []);
 
   useEffect(() => {
@@ -69,6 +69,9 @@ export default function TransactionForm({ initial, onSubmit, submitLabel }: Prop
       // If switching to LOAN entity and current nature isn't valid, reset to EMI_PAYMENT
       if (f.entity === 'LOAN' && f.nature !== 'EMI_PAYMENT' && f.nature !== 'LOAN_DISBURSEMENT') {
         updates.nature = 'EMI_PAYMENT';
+      }
+      if (f.entity !== 'LOAN' && (f.nature === 'EMI_PAYMENT' || f.nature === 'LOAN_DISBURSEMENT')) {
+        updates.nature = 'EXPENSE';
       }
       return { ...f, ...updates };
     });
@@ -95,13 +98,16 @@ export default function TransactionForm({ initial, onSubmit, submitLabel }: Prop
     }
   }, [form.principal_amount, form.interest_amount, form.nature]);
 
-  // Auto-set payment method to 'Cash' if source is Cash(Hand)
+  // Pre-fill interest_amount from selected loan account's interest_rate.
+  // Depends on `accounts` so it also fires when accounts finish loading after a
+  // template is pre-populated (target_account_id already set, accounts was still empty).
   useEffect(() => {
-    const sourceAccount = accounts.find(a => a.id.toString() === form.source_account_id);
-    if (sourceAccount && sourceAccount.name.toLowerCase().includes('cash')) {
-      setForm(f => ({ ...f, payment_method: 'Cash' }));
-    }
-  }, [form.source_account_id, accounts]);
+    if (form.nature !== 'EMI_PAYMENT' || !form.target_account_id) return;
+    const account = accounts.find((a) => a.id.toString() === form.target_account_id);
+    if (!account || account.interest_rate <= 0) return;
+    const monthly = (account.current_balance * account.interest_rate) / 100 / 12;
+    setForm((f) => ({ ...f, interest_amount: monthly.toFixed(2) }));
+  }, [form.target_account_id, form.nature, accounts]);
 
   // Clear irrelevant fields when nature changes
   useEffect(() => {
@@ -137,14 +143,12 @@ export default function TransactionForm({ initial, onSubmit, submitLabel }: Prop
     }
   };
 
-  const assetAccounts = accounts.filter((a) => a.type === 'ASSET' && a.is_active);
   const liabilityAccounts = accounts.filter((a) => a.type === 'LIABILITY' && a.is_active);
-  const needsTarget = form.nature === 'TRANSFER' || form.nature === 'EMI_PAYMENT' || form.nature === 'LOAN_DISBURSEMENT';
 
   // Filter transaction types based on entity
   const availableNatures = form.entity === 'LOAN'
     ? NATURES.filter((n) => n === 'EMI_PAYMENT' || n === 'LOAN_DISBURSEMENT')
-    : NATURES;
+    : NATURES.filter((n) => n === 'INCOME' || n === 'EXPENSE');
 
   // Find selected category and its sub-categories
   const selectedCategory = categories.find((c) => c.id.toString() === selectedCategoryId);
@@ -211,6 +215,32 @@ export default function TransactionForm({ initial, onSubmit, submitLabel }: Prop
         />
       </div>
 
+      {/* Loan Account - only for LOAN entity; placed before EMI split so interest auto-fills first */}
+      {form.entity === 'LOAN' && (
+        <div>
+          <label className="text-xs text-gray-500 mb-1 block">Loan Account *</label>
+          <select
+            value={form.nature === 'LOAN_DISBURSEMENT' ? form.source_account_id : form.target_account_id}
+            onChange={(e) => {
+              if (form.nature === 'LOAN_DISBURSEMENT') {
+                set('source_account_id', e.target.value);
+              } else {
+                set('target_account_id', e.target.value);
+              }
+            }}
+            required
+            className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"
+          >
+            <option value="">Select loan account</option>
+            {liabilityAccounts.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name} — ₹{a.current_balance.toLocaleString('en-IN')} outstanding{a.interest_rate > 0 ? ` · ${a.interest_rate}% p.a.` : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {/* Amount (hidden for EMI_PAYMENT since it's auto-calculated) */}
       {form.nature !== 'EMI_PAYMENT' && (
         <div>
@@ -229,81 +259,53 @@ export default function TransactionForm({ initial, onSubmit, submitLabel }: Prop
       )}
 
       {/* EMI split: principal + interest */}
-      {form.nature === 'EMI_PAYMENT' && (
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <label className="text-xs text-gray-500 mb-1 block">Principal (₹)</label>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={form.principal_amount}
-              onChange={(e) => set('principal_amount', e.target.value)}
-              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-            />
+      {form.nature === 'EMI_PAYMENT' && (() => {
+        const selectedLoan = accounts.find((a) => a.id.toString() === form.target_account_id);
+        const suggestedInterest = selectedLoan && selectedLoan.interest_rate > 0
+          ? (selectedLoan.current_balance * selectedLoan.interest_rate / 100 / 12)
+          : null;
+        return (
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">Principal (₹)</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={form.principal_amount}
+                onChange={(e) => set('principal_amount', e.target.value)}
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gray-500 mb-1 block">
+                Interest (₹)
+                {suggestedInterest !== null && (
+                  <span className="ml-1 text-orange-500 font-normal">
+                    · {selectedLoan!.interest_rate}% p.a.
+                  </span>
+                )}
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={form.interest_amount}
+                onChange={(e) => set('interest_amount', e.target.value)}
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+              />
+              {suggestedInterest !== null && (
+                <p className="text-[10px] text-orange-500 mt-0.5">
+                  Suggested ₹{suggestedInterest.toLocaleString('en-IN', { maximumFractionDigits: 2 })} on ₹{selectedLoan!.current_balance.toLocaleString('en-IN')} outstanding
+                </p>
+              )}
+            </div>
+            <p className="col-span-2 text-xs text-gray-500">
+              Total EMI: ₹{(parseFloat(form.principal_amount || '0') + parseFloat(form.interest_amount || '0')).toLocaleString('en-IN')}
+            </p>
           </div>
-          <div>
-            <label className="text-xs text-gray-500 mb-1 block">Interest (₹)</label>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={form.interest_amount}
-              onChange={(e) => set('interest_amount', e.target.value)}
-              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-            />
-          </div>
-          <p className="col-span-2 text-xs text-gray-500">
-            Total: ₹{(parseFloat(form.principal_amount || '0') + parseFloat(form.interest_amount || '0')).toLocaleString('en-IN')}
-          </p>
-        </div>
-      )}
-
-      {/* Source Account */}
-      <div>
-        <label className="text-xs text-gray-500 mb-1 block">
-          {form.nature === 'LOAN_DISBURSEMENT' ? 'Loan Account *' : 'Source Account *'}
-        </label>
-        <select
-          value={form.source_account_id}
-          onChange={(e) => set('source_account_id', e.target.value)}
-          required
-          className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"
-        >
-          <option value="">
-            {form.nature === 'LOAN_DISBURSEMENT' ? 'Select loan account' : 'Select source account'}
-          </option>
-          {(form.nature === 'LOAN_DISBURSEMENT' ? liabilityAccounts : assetAccounts).map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.name} (₹{a.current_balance.toLocaleString('en-IN')})
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* Target Account (for Transfer/EMI/LOAN_DISBURSEMENT) */}
-      {needsTarget && (
-        <div>
-          <label className="text-xs text-gray-500 mb-1 block">
-            {form.nature === 'EMI_PAYMENT' ? 'Loan Account *' : form.nature === 'LOAN_DISBURSEMENT' ? 'Bank Account *' : 'Target Account *'}
-          </label>
-          <select
-            value={form.target_account_id}
-            onChange={(e) => set('target_account_id', e.target.value)}
-            required
-            className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"
-          >
-            <option value="">
-              {form.nature === 'EMI_PAYMENT' ? 'Select loan account' : form.nature === 'LOAN_DISBURSEMENT' ? 'Select bank account' : 'Select target account'}
-            </option>
-            {(form.nature === 'EMI_PAYMENT' ? liabilityAccounts : assetAccounts).map((a) => (
-              <option key={a.id} value={a.id}>
-                {a.name} (₹{a.current_balance.toLocaleString('en-IN')})
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Category / Sub-category - Only for INCOME and EXPENSE */}
       {(form.nature === 'INCOME' || form.nature === 'EXPENSE') && (

@@ -4,7 +4,7 @@ import { templatesApi } from '../api/client';
 import type { TransactionTemplate } from '../api/types';
 
 const natureLabels: Record<string, string> = {
-  INCOME: 'Income', EXPENSE: 'Expense', TRANSFER: 'Transfer', EMI_PAYMENT: 'EMI',
+  INCOME: 'Income', EXPENSE: 'Expense', EMI_PAYMENT: 'EMI', LOAN_DISBURSEMENT: 'Loan',
 };
 
 export default function TemplatesPage() {

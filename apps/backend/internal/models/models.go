@@ -28,6 +28,7 @@ type Account struct {
 	Type           AccountType `json:"type"`
 	InitialBalance float64     `json:"initial_balance"`
 	CurrentBalance float64     `json:"current_balance"`
+	InterestRate   float64     `json:"interest_rate"`
 	IsActive       bool        `json:"is_active"`
 	CreatedAt      time.Time   `json:"created_at"`
 }
@@ -113,11 +114,13 @@ type CreateAccountReq struct {
 	Name           string      `json:"name"`
 	Type           AccountType `json:"type"`
 	InitialBalance float64     `json:"initial_balance"`
+	InterestRate   float64     `json:"interest_rate"`
 }
 
 type UpdateAccountReq struct {
-	Name     *string `json:"name,omitempty"`
-	IsActive *bool   `json:"is_active,omitempty"`
+	Name         *string  `json:"name,omitempty"`
+	InterestRate *float64 `json:"interest_rate,omitempty"`
+	IsActive     *bool    `json:"is_active,omitempty"`
 }
 
 type CreateCategoryReq struct {

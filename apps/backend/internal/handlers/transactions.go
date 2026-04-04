@@ -120,10 +120,9 @@ func (h *TransactionHandler) Export(w http.ResponseWriter, r *http.Request) {
 	query := `SELECT t.id, t.user_id, t.title, t.amount, t.nature, t.source_account_id,
 		t.target_account_id, t.sub_category_id, t.entity, t.payment_method,
 		t.notes, t.principal_amount, t.interest_amount, t.transaction_date, t.created_at,
-		sa.name as source_account_name, ta.name as target_account_name, 
+		ta.name as target_account_name,
 		sc.name as sub_category_name, c.name as category_name
 		FROM transactions t
-		LEFT JOIN accounts sa ON t.source_account_id = sa.id
 		LEFT JOIN accounts ta ON t.target_account_id = ta.id
 		LEFT JOIN sub_categories sc ON t.sub_category_id = sc.id
 		LEFT JOIN categories c ON sc.category_id = c.id
@@ -168,7 +167,6 @@ func (h *TransactionHandler) Export(w http.ResponseWriter, r *http.Request) {
 
 	type ExportRow struct {
 		models.Transaction
-		SourceAccountName string
 		TargetAccountName *string
 		SubCategoryName   *string
 		CategoryName      *string
@@ -182,7 +180,7 @@ func (h *TransactionHandler) Export(w http.ResponseWriter, r *http.Request) {
 		err := rows.Scan(&er.ID, &er.UserID, &er.Title, &er.Amount, &er.Nature, &er.SourceAccountID,
 			&er.TargetAccountID, &er.SubCategoryID, &er.Entity, &paymentMethod,
 			&notes, &er.PrincipalAmount, &er.InterestAmount, &txDate, &er.CreatedAt,
-			&er.SourceAccountName, &targetName, &subCatName, &catName)
+			&targetName, &subCatName, &catName)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "Failed to scan row")
 			return
@@ -200,7 +198,7 @@ func (h *TransactionHandler) Export(w http.ResponseWriter, r *http.Request) {
 		data = append(data, er)
 	}
 
-	headers := []string{"Date", "Title", "Amount", "Nature", "Entity", "Source Account", "Target Account", "Category", "Sub Category", "Payment Method", "Notes"}
+	headers := []string{"Date", "Title", "Amount", "Nature", "Entity", "Loan Account", "Category", "Sub Category", "Payment Method", "Notes"}
 
 	if format == "csv" {
 		w.Header().Set("Content-Type", "text/csv")
@@ -208,9 +206,9 @@ func (h *TransactionHandler) Export(w http.ResponseWriter, r *http.Request) {
 		writer := csv.NewWriter(w)
 		writer.Write(headers)
 		for _, d := range data {
-			target := ""
+			loanAccount := ""
 			if d.TargetAccountName != nil {
-				target = *d.TargetAccountName
+				loanAccount = *d.TargetAccountName
 			}
 			cat := ""
 			if d.CategoryName != nil {
@@ -226,8 +224,7 @@ func (h *TransactionHandler) Export(w http.ResponseWriter, r *http.Request) {
 				fmt.Sprintf("%.2f", d.Amount),
 				string(d.Nature),
 				string(d.Entity),
-				d.SourceAccountName,
-				target,
+				loanAccount,
 				cat,
 				subCat,
 				d.PaymentMethod,
@@ -250,9 +247,9 @@ func (h *TransactionHandler) Export(w http.ResponseWriter, r *http.Request) {
 		// Set data
 		for i, d := range data {
 			rowIdx := i + 2
-			target := ""
+			loanAccount := ""
 			if d.TargetAccountName != nil {
-				target = *d.TargetAccountName
+				loanAccount = *d.TargetAccountName
 			}
 			cat := ""
 			if d.CategoryName != nil {
@@ -267,12 +264,11 @@ func (h *TransactionHandler) Export(w http.ResponseWriter, r *http.Request) {
 			f.SetCellValue(sheet, fmt.Sprintf("C%d", rowIdx), d.Amount)
 			f.SetCellValue(sheet, fmt.Sprintf("D%d", rowIdx), string(d.Nature))
 			f.SetCellValue(sheet, fmt.Sprintf("E%d", rowIdx), string(d.Entity))
-			f.SetCellValue(sheet, fmt.Sprintf("F%d", rowIdx), d.SourceAccountName)
-			f.SetCellValue(sheet, fmt.Sprintf("G%d", rowIdx), target)
-			f.SetCellValue(sheet, fmt.Sprintf("H%d", rowIdx), cat)
-			f.SetCellValue(sheet, fmt.Sprintf("I%d", rowIdx), subCat)
-			f.SetCellValue(sheet, fmt.Sprintf("J%d", rowIdx), d.PaymentMethod)
-			f.SetCellValue(sheet, fmt.Sprintf("K%d", rowIdx), d.Notes)
+			f.SetCellValue(sheet, fmt.Sprintf("F%d", rowIdx), loanAccount)
+			f.SetCellValue(sheet, fmt.Sprintf("G%d", rowIdx), cat)
+			f.SetCellValue(sheet, fmt.Sprintf("H%d", rowIdx), subCat)
+			f.SetCellValue(sheet, fmt.Sprintf("I%d", rowIdx), d.PaymentMethod)
+			f.SetCellValue(sheet, fmt.Sprintf("J%d", rowIdx), d.Notes)
 		}
 
 		w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
@@ -327,6 +323,15 @@ func (h *TransactionHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Default source_account_id to the user's primary asset account when not provided
+	if req.SourceAccountID == 0 {
+		primaryID, err := h.getPrimaryAssetAccountID(r.Context(), userID)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "source_account_id not provided and no primary asset account found")
+			return
+		}
+		req.SourceAccountID = primaryID
+	}
 	if err := validateTransactionReq(&req); err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -391,6 +396,15 @@ func (h *TransactionHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Default source_account_id to the user's primary asset account when not provided
+	if req.SourceAccountID == 0 {
+		primaryID, err := h.getPrimaryAssetAccountID(r.Context(), userID)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "source_account_id not provided and no primary asset account found")
+			return
+		}
+		req.SourceAccountID = primaryID
+	}
 	if err := validateTransactionReq(&req); err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -543,15 +557,8 @@ func applyBalanceChange(ctx context.Context, tx pgx.Tx, userID int, nature model
 		}
 		return nil
 	case models.NatureLoanDisbursement:
-		if targetID == nil {
-			return fmt.Errorf("target bank account required for loan disbursement")
-		}
-		// Source (loan) increases by amount (you owe more)
-		if _, err := tx.Exec(ctx, "UPDATE accounts SET current_balance = current_balance + $1 WHERE id = $2 AND user_id = $3", amount, sourceID, userID); err != nil {
-			return err
-		}
-		// Target (bank) receives the money
-		_, err := tx.Exec(ctx, "UPDATE accounts SET current_balance = current_balance + $1 WHERE id = $2 AND user_id = $3", amount, *targetID, userID)
+		// Source (loan) increases by amount (you owe more); bank account not tracked
+		_, err := tx.Exec(ctx, "UPDATE accounts SET current_balance = current_balance + $1 WHERE id = $2 AND user_id = $3", amount, sourceID, userID)
 		return err
 	}
 	return fmt.Errorf("unknown nature: %s", nature)
@@ -616,10 +623,12 @@ func validateTransactionReq(req *models.CreateTransactionReq) error {
 	switch req.Nature {
 	case models.NatureIncome, models.NatureExpense:
 		// OK, no target needed
-	case models.NatureTransfer, models.NatureEMIPayment, models.NatureLoanDisbursement:
+	case models.NatureTransfer, models.NatureEMIPayment:
 		if req.TargetAccountID == nil || *req.TargetAccountID <= 0 {
 			return fmt.Errorf("target_account_id is required for %s", req.Nature)
 		}
+	case models.NatureLoanDisbursement:
+		// target_account_id not required — bank account is not tracked in simplified model
 	default:
 		return fmt.Errorf("nature must be INCOME, EXPENSE, TRANSFER, EMI_PAYMENT, or LOAN_DISBURSEMENT")
 	}
@@ -681,4 +690,13 @@ func nilIfEmpty(s string) *string {
 		return nil
 	}
 	return &s
+}
+
+// getPrimaryAssetAccountID returns the first active ASSET account ID for the given user.
+func (h *TransactionHandler) getPrimaryAssetAccountID(ctx context.Context, userID int) (int, error) {
+	var id int
+	err := h.db.QueryRow(ctx,
+		`SELECT id FROM accounts WHERE user_id = $1 AND type = 'ASSET' AND is_active = true ORDER BY id LIMIT 1`,
+		userID).Scan(&id)
+	return id, err
 }

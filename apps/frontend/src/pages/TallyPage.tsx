@@ -10,11 +10,10 @@ export default function TallyPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    accountsApi.list().then((a) => {
+    accountsApi.list({ type: 'LIABILITY' }).then((a) => {
       const list = a || [];
-      const assets = list.filter((acc) => acc.type === 'ASSET' && acc.is_active);
-      setAccounts(assets);
-      if (assets.length > 0) setSelectedId(assets[0].id);
+      setAccounts(list);
+      if (list.length > 0) setSelectedId(list[0].id);
     }).catch(() => setAccounts([]));
   }, []);
 
@@ -35,9 +34,9 @@ export default function TallyPage() {
 
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-semibold text-gray-800">Tally / Reconciliation</h2>
+      <h2 className="text-lg font-semibold text-gray-800">Loan Reconciliation</h2>
       <p className="text-sm text-gray-500">
-        Compare your actual bank balance with FinTrack's calculated balance to find untracked transactions.
+        Compare FinTrack's outstanding balance with your lender's actual statement.
       </p>
 
       <form onSubmit={handleCheck} className="space-y-3">
@@ -53,7 +52,7 @@ export default function TallyPage() {
 
         <input
           type="number" step="0.01"
-          placeholder="Enter actual balance from bank app (₹)"
+          placeholder="Enter outstanding balance from lender's statement (₹)"
           value={actualBalance}
           onChange={(e) => setActualBalance(e.target.value)}
           required
@@ -75,11 +74,11 @@ export default function TallyPage() {
           <h3 className="font-semibold text-gray-800">{result.account_name}</h3>
           <div className="grid grid-cols-2 gap-2 text-sm">
             <div>
-              <p className="text-gray-500">Calculated Balance</p>
+              <p className="text-gray-500">FinTrack Outstanding</p>
               <p className="font-medium">₹{result.calculated_balance.toLocaleString('en-IN')}</p>
             </div>
             <div>
-              <p className="text-gray-500">Actual Balance</p>
+              <p className="text-gray-500">Lender's Statement</p>
               <p className="font-medium">₹{result.actual_balance.toLocaleString('en-IN')}</p>
             </div>
           </div>

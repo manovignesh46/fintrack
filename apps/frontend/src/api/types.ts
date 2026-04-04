@@ -21,6 +21,7 @@ export interface Account {
   type: AccountType;
   initial_balance: number;
   current_balance: number;
+  interest_rate: number;
   is_active: boolean;
   created_at: string;
 }
@@ -117,4 +118,4 @@ export const PAYMENT_METHODS = [
 ] as const;
 
 export const ENTITIES: EntityType[] = ['PERSONAL', 'HOME', 'LOAN'];
-export const NATURES: TxNature[] = ['INCOME', 'EXPENSE', 'TRANSFER', 'EMI_PAYMENT', 'LOAN_DISBURSEMENT'];
+export const NATURES: TxNature[] = ['INCOME', 'EXPENSE', 'EMI_PAYMENT', 'LOAN_DISBURSEMENT'];
