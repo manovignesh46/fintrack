@@ -83,6 +83,7 @@ func main() {
 				r.Post("/", accountH.Create)
 				r.Get("/{id}", accountH.Get)
 				r.Put("/{id}", accountH.Update)
+				r.Delete("/{id}", accountH.Delete)
 			})
 
 			// Categories & Sub-categories

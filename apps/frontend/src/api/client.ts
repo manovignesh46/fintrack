@@ -81,6 +81,8 @@ export const accountsApi = {
     request<Account>('/accounts', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: number, data: { name?: string; is_active?: boolean }) =>
     request<Account>(`/accounts/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (id: number) =>
+    request<void>(`/accounts/${id}`, { method: 'DELETE' }),
 };
 
 // --- Categories ---

@@ -185,15 +185,57 @@ func (h *AccountHandler) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Return updated account
-	var a models.Account
+	var updatedAccount models.Account
 	err = h.db.QueryRow(r.Context(),
 		`SELECT id, user_id, name, type, initial_balance, current_balance, is_active, created_at
 		 FROM accounts WHERE id = $1 AND user_id = $2`, id, userID).Scan(
-		&a.ID, &a.UserID, &a.Name, &a.Type, &a.InitialBalance, &a.CurrentBalance, &a.IsActive, &a.CreatedAt)
+		&updatedAccount.ID, &updatedAccount.UserID, &updatedAccount.Name, &updatedAccount.Type, &updatedAccount.InitialBalance, &updatedAccount.CurrentBalance, &updatedAccount.IsActive, &updatedAccount.CreatedAt)
 	if err != nil {
 		writeError(w, http.StatusNotFound, "Account not found")
 		return
 	}
 
-	writeJSON(w, http.StatusOK, a)
+	writeJSON(w, http.StatusOK, updatedAccount)
+}
+
+func (h *AccountHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	userID, err := GetUserID(r)
+	if err != nil {
+		writeError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	id, err := strconv.Atoi(chi.URLParam(r, "id"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid account ID")
+		return
+	}
+
+	// Check if account has transactions
+	var count int
+	err = h.db.QueryRow(r.Context(),
+		"SELECT COUNT(*) FROM transactions WHERE (source_account_id = $1 OR target_account_id = $1) AND user_id = $2",
+		id, userID).Scan(&count)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to check account transactions")
+		return
+	}
+
+	if count > 0 {
+		writeError(w, http.StatusBadRequest, "Cannot delete account with transactions. Try deactivating it instead.")
+		return
+	}
+
+	tag, err := h.db.Exec(r.Context(), "DELETE FROM accounts WHERE id = $1 AND user_id = $2", id, userID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "Failed to delete account")
+		return
+	}
+
+	if tag.RowsAffected() == 0 {
+		writeError(w, http.StatusNotFound, "Account not found")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }

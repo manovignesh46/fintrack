@@ -49,6 +49,16 @@ export default function AccountsPage() {
     }
   };
 
+  const handleDelete = async (a: Account) => {
+    if (!window.confirm(`Delete "${a.name}"? This cannot be undone.`)) return;
+    try {
+      await accountsApi.delete(a.id);
+      load();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to delete');
+    }
+  };
+
   const handleAccountClick = (account: Account) => {
     navigate(`/accounts/${account.id}`);
   };
@@ -107,6 +117,7 @@ export default function AccountsPage() {
               key={a.id} 
               account={a} 
               onToggle={handleToggle} 
+              onDelete={handleDelete}
               onClick={handleAccountClick}
             />
           ))}
@@ -122,6 +133,7 @@ export default function AccountsPage() {
               key={a.id} 
               account={a} 
               onToggle={handleToggle} 
+              onDelete={handleDelete}
               onClick={handleAccountClick}
               colorClass="text-orange-600" 
             />
@@ -135,11 +147,13 @@ export default function AccountsPage() {
 function AccountCard({
   account,
   onToggle,
+  onDelete,
   onClick,
   colorClass = 'text-green-600',
 }: {
   account: Account;
   onToggle: (a: Account) => void;
+  onDelete: (a: Account) => void;
   onClick: (a: Account) => void;
   colorClass?: string;
 }) {
@@ -149,7 +163,21 @@ function AccountCard({
       onClick={() => onClick(account)}
     >
       <div className="flex justify-between items-center">
-        <p className="font-medium text-gray-800 text-sm">{account.name}</p>
+        <div className="flex items-center gap-2">
+          <p className="font-medium text-gray-800 text-sm">{account.name}</p>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(account);
+            }}
+            className="text-gray-300 hover:text-red-500 transition-colors p-1"
+            title="Delete Account"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </button>
+        </div>
         <p className={`font-semibold ${colorClass}`}>
           ₹{account.current_balance.toLocaleString('en-IN')}
         </p>
