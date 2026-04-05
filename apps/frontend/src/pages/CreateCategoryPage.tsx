@@ -1,14 +1,23 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { categoriesApi } from '../api/client';
 import { ENTITIES } from '../api/types';
 import type { EntityType, TxNature } from '../api/types';
 
+const STORAGE_ENTITY_KEY = 'cat_filter_entity';
+const STORAGE_NATURE_KEY = 'cat_filter_nature';
+
 export default function CreateCategoryPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const locState = location.state as { entity?: EntityType; nature?: TxNature } | null;
   const [name, setName] = useState('');
-  const [entity, setEntity] = useState<EntityType>('PERSONAL');
-  const [nature, setNature] = useState<TxNature>('EXPENSE');
+  const [entity, setEntity] = useState<EntityType>(
+    locState?.entity ?? (sessionStorage.getItem(STORAGE_ENTITY_KEY) as EntityType) ?? 'PERSONAL'
+  );
+  const [nature, setNature] = useState<TxNature>(
+    locState?.nature ?? (sessionStorage.getItem(STORAGE_NATURE_KEY) as TxNature) ?? 'EXPENSE'
+  );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -24,6 +33,8 @@ export default function CreateCategoryPage() {
         entity,
         nature
       });
+      sessionStorage.setItem(STORAGE_ENTITY_KEY, entity);
+      sessionStorage.setItem(STORAGE_NATURE_KEY, nature);
       navigate('/categories');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create category');

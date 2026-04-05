@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -104,7 +105,15 @@ func (h *TallyHandler) Summary(w http.ResponseWriter, r *http.Request) {
 	}
 
 	dateFrom := month + "-01"
-	dateTo := month + "-31"
+	// Parse to compute the real last day of the month, avoiding invalid dates like April-31
+	t, err := time.Parse("2006-01", month)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid month format, expected YYYY-MM")
+		return
+	}
+	// First day of next month minus one day = last day of this month
+	firstOfNext := time.Date(t.Year(), t.Month()+1, 1, 0, 0, 0, 0, time.UTC)
+	dateTo := firstOfNext.AddDate(0, 0, -1).Format("2006-01-02")
 
 	rows, err := h.db.Query(r.Context(), `
 		SELECT entity,

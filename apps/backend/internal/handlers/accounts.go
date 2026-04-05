@@ -222,18 +222,22 @@ func (h *AccountHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check if account has transactions
+	// Check if account has transactions or templates referencing it
 	var count int
 	err = h.db.QueryRow(r.Context(),
-		"SELECT COUNT(*) FROM transactions WHERE (source_account_id = $1 OR target_account_id = $1) AND user_id = $2",
-		id, userID).Scan(&count)
+		`SELECT COUNT(*) FROM (
+			SELECT id FROM transactions WHERE source_account_id = $1 OR target_account_id = $1
+			UNION ALL
+			SELECT id FROM transaction_templates WHERE source_account_id = $1 OR target_account_id = $1
+		) refs`,
+		id).Scan(&count)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "Failed to check account transactions")
 		return
 	}
 
 	if count > 0 {
-		writeError(w, http.StatusBadRequest, "Cannot delete account with transactions. Try deactivating it instead.")
+		writeError(w, http.StatusBadRequest, "Cannot delete account with transactions or templates. Try deactivating it instead.")
 		return
 	}
 

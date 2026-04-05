@@ -4,12 +4,22 @@ import { categoriesApi } from '../api/client';
 import type { Category, EntityType, TxNature } from '../api/types';
 import { ENTITIES } from '../api/types';
 
+const STORAGE_ENTITY_KEY = 'cat_filter_entity';
+const STORAGE_NATURE_KEY = 'cat_filter_nature';
+
 export default function CategoriesPage() {
   const navigate = useNavigate();
-  const [selectedEntity, setSelectedEntity] = useState<EntityType>('PERSONAL');
-  const [selectedNature, setSelectedNature] = useState<TxNature>('EXPENSE');
+  const [selectedEntity, setSelectedEntity] = useState<EntityType>(
+    () => (sessionStorage.getItem(STORAGE_ENTITY_KEY) as EntityType) || 'PERSONAL'
+  );
+  const [selectedNature, setSelectedNature] = useState<TxNature>(
+    () => (sessionStorage.getItem(STORAGE_NATURE_KEY) as TxNature) || 'EXPENSE'
+  );
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  const [addingSubFor, setAddingSubFor] = useState<number | null>(null);
+  const [newSubName, setNewSubName] = useState('');
+  const [subSubmitting, setSubSubmitting] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -19,7 +29,11 @@ export default function CategoriesPage() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, [selectedEntity, selectedNature]);
+  useEffect(() => {
+    sessionStorage.setItem(STORAGE_ENTITY_KEY, selectedEntity);
+    sessionStorage.setItem(STORAGE_NATURE_KEY, selectedNature);
+    load();
+  }, [selectedEntity, selectedNature]);
 
   const deleteCategory = async (id: number) => {
     if (!confirm('Delete category and all its sub-categories?')) return;
@@ -35,6 +49,23 @@ export default function CategoriesPage() {
       await categoriesApi.deleteSub(categoryId, subId);
       load();
     } catch { alert('Failed'); }
+  };
+
+  const handleAddSub = (catId: number) => {
+    setAddingSubFor(catId);
+    setNewSubName('');
+  };
+
+  const handleSubSubmit = async (catId: number) => {
+    if (!newSubName.trim()) return;
+    setSubSubmitting(true);
+    try {
+      await categoriesApi.createSub(catId, { name: newSubName.trim() });
+      setAddingSubFor(null);
+      setNewSubName('');
+      load();
+    } catch { alert('Failed to create sub-category'); }
+    finally { setSubSubmitting(false); }
   };
 
   return (
@@ -83,7 +114,7 @@ export default function CategoriesPage() {
                 <span className="font-bold text-gray-800 text-sm italic">{cat.name}</span>
                 <div className="flex gap-3">
                   <button
-                    onClick={() => navigate(`/categories/${cat.id}/sub/new`)}
+                    onClick={() => handleAddSub(cat.id)}
                     className="text-xs bg-blue-50 text-blue-600 px-2.5 py-1 rounded-md font-semibold border border-blue-100"
                   >
                     + Sub
@@ -96,7 +127,7 @@ export default function CategoriesPage() {
 
               {/* Sub-categories */}
               <div className="divide-y divide-gray-50">
-                {(cat.sub_categories ?? []).length === 0 ? (
+                {(cat.sub_categories ?? []).length === 0 && addingSubFor !== cat.id ? (
                   <p className="px-5 py-3 text-xs text-gray-400 italic">No sub-categories</p>
                 ) : (
                   (cat.sub_categories ?? []).map((sc) => (
@@ -108,6 +139,35 @@ export default function CategoriesPage() {
                     </div>
                   ))
                 )}
+                {addingSubFor === cat.id && (
+                  <div className="flex items-center gap-2 px-4 py-2.5 bg-blue-50">
+                    <input
+                      type="text"
+                      value={newSubName}
+                      onChange={(e) => setNewSubName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleSubSubmit(cat.id);
+                        if (e.key === 'Escape') setAddingSubFor(null);
+                      }}
+                      placeholder="Sub-category name"
+                      autoFocus
+                      className="flex-1 px-2.5 py-1.5 border border-blue-300 rounded-md text-sm focus:ring-2 focus:ring-blue-400 outline-none bg-white"
+                    />
+                    <button
+                      onClick={() => handleSubSubmit(cat.id)}
+                      disabled={subSubmitting || !newSubName.trim()}
+                      className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-md font-semibold disabled:opacity-50"
+                    >
+                      {subSubmitting ? '...' : 'Add'}
+                    </button>
+                    <button
+                      onClick={() => setAddingSubFor(null)}
+                      className="text-xs text-gray-500 px-2 py-1.5"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           ))}
@@ -116,7 +176,7 @@ export default function CategoriesPage() {
 
       {/* Floating Action Button */}
       <button
-        onClick={() => navigate('/categories/new')}
+        onClick={() => navigate('/categories/new', { state: { entity: selectedEntity, nature: selectedNature } })}
         className="fixed bottom-20 right-6 w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center text-3xl hover:bg-blue-700 transition-all active:scale-95 z-40"
       >
         +
