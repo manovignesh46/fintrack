@@ -12,7 +12,6 @@ const (
 
 	EntityPersonal EntityType = "PERSONAL"
 	EntityHome     EntityType = "HOME"
-	EntityLoan     EntityType = "LOAN"
 
 	NatureIncome           TxNature = "INCOME"
 	NatureExpense          TxNature = "EXPENSE"

@@ -101,8 +101,8 @@ func (h *CategoryHandler) Create(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "Name is required")
 		return
 	}
-	if req.Entity != models.EntityPersonal && req.Entity != models.EntityHome && req.Entity != models.EntityLoan {
-		writeError(w, http.StatusBadRequest, "Entity must be PERSONAL, HOME, or LOAN")
+	if req.Entity != models.EntityPersonal && req.Entity != models.EntityHome {
+		writeError(w, http.StatusBadRequest, "Entity must be PERSONAL or HOME")
 		return
 	}
 	if req.Nature != models.NatureIncome && req.Nature != models.NatureExpense {

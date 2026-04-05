@@ -1,5 +1,5 @@
 export type AccountType = 'ASSET' | 'LIABILITY';
-export type EntityType = 'PERSONAL' | 'HOME' | 'LOAN';
+export type EntityType = 'PERSONAL' | 'HOME';
 export type TxNature = 'INCOME' | 'EXPENSE' | 'TRANSFER' | 'EMI_PAYMENT' | 'LOAN_DISBURSEMENT';
 
 export interface User {
@@ -117,5 +117,5 @@ export const PAYMENT_METHODS = [
   'Cash',
 ] as const;
 
-export const ENTITIES: EntityType[] = ['PERSONAL', 'HOME', 'LOAN'];
+export const ENTITIES: EntityType[] = ['PERSONAL', 'HOME'];
 export const NATURES: TxNature[] = ['INCOME', 'EXPENSE', 'EMI_PAYMENT', 'LOAN_DISBURSEMENT'];

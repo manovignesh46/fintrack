@@ -65,15 +65,7 @@ export default function TransactionForm({ initial, onSubmit, submitLabel }: Prop
       }
 
       setSelectedCategoryId('');
-      const updates: Partial<TransactionFormData> = { sub_category_id: '' };
-      // If switching to LOAN entity and current nature isn't valid, reset to EMI_PAYMENT
-      if (f.entity === 'LOAN' && f.nature !== 'EMI_PAYMENT' && f.nature !== 'LOAN_DISBURSEMENT') {
-        updates.nature = 'EMI_PAYMENT';
-      }
-      if (f.entity !== 'LOAN' && (f.nature === 'EMI_PAYMENT' || f.nature === 'LOAN_DISBURSEMENT')) {
-        updates.nature = 'EXPENSE';
-      }
-      return { ...f, ...updates };
+      return { ...f, sub_category_id: '' };
     });
   }, [form.entity, form.nature]);
 
@@ -145,10 +137,8 @@ export default function TransactionForm({ initial, onSubmit, submitLabel }: Prop
 
   const liabilityAccounts = accounts.filter((a) => a.type === 'LIABILITY' && a.is_active);
 
-  // Filter transaction types based on entity
-  const availableNatures = form.entity === 'LOAN'
-    ? NATURES.filter((n) => n === 'EMI_PAYMENT' || n === 'LOAN_DISBURSEMENT')
-    : NATURES.filter((n) => n === 'INCOME' || n === 'EXPENSE');
+  // All natures available for all entities
+  const availableNatures = NATURES;
 
   // Find selected category and its sub-categories
   const selectedCategory = categories.find((c) => c.id.toString() === selectedCategoryId);
@@ -215,8 +205,8 @@ export default function TransactionForm({ initial, onSubmit, submitLabel }: Prop
         />
       </div>
 
-      {/* Loan Account - only for LOAN entity; placed before EMI split so interest auto-fills first */}
-      {form.entity === 'LOAN' && (
+      {/* Loan Account - shown for EMI_PAYMENT and LOAN_DISBURSEMENT natures */}
+      {(form.nature === 'EMI_PAYMENT' || form.nature === 'LOAN_DISBURSEMENT') && (
         <div>
           <label className="text-xs text-gray-500 mb-1 block">Loan Account *</label>
           <select

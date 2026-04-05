@@ -643,9 +643,9 @@ func validateTransactionReq(req *models.CreateTransactionReq) error {
 	}
 
 	switch req.Entity {
-	case models.EntityPersonal, models.EntityHome, models.EntityLoan:
+	case models.EntityPersonal, models.EntityHome:
 	default:
-		return fmt.Errorf("entity must be PERSONAL, HOME, or LOAN")
+		return fmt.Errorf("entity must be PERSONAL or HOME")
 	}
 
 	return nil
