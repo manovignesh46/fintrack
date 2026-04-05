@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { templatesApi } from '../api/client';
 import type { TransactionTemplate } from '../api/types';
+import { useAuth } from '../context/AuthContext';
 
 const natureLabels: Record<string, string> = {
   INCOME: 'Income', EXPENSE: 'Expense', EMI_PAYMENT: 'EMI', LOAN_DISBURSEMENT: 'Loan',
@@ -11,6 +12,7 @@ export default function TemplatesPage() {
   const [templates, setTemplates] = useState<TransactionTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { editMode } = useAuth();
 
   const load = () => {
     setLoading(true);
@@ -81,12 +83,14 @@ export default function TemplatesPage() {
                   >
                     Use
                   </button>
-                  <button
-                    onClick={() => handleDelete(t.id)}
-                    className="px-3 py-1.5 bg-red-100 text-red-600 rounded text-xs font-medium"
-                  >
-                    Del
-                  </button>
+                  {editMode && (
+                    <button
+                      onClick={() => handleDelete(t.id)}
+                      className="px-3 py-1.5 bg-red-100 text-red-600 rounded text-xs font-medium"
+                    >
+                      Del
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -95,13 +99,15 @@ export default function TemplatesPage() {
       )}
 
       {/* Floating Action Button for Creating Template */}
-      <button
-        onClick={() => navigate('/templates/new')}
-        className="fixed bottom-24 right-6 w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center text-3xl hover:bg-blue-700 transition-colors z-20"
-        aria-label="Create Template"
-      >
-        +
-      </button>
+      {editMode && (
+        <button
+          onClick={() => navigate('/templates/new')}
+          className="fixed bottom-24 right-6 w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center text-3xl hover:bg-blue-700 transition-colors z-20"
+          aria-label="Create Template"
+        >
+          +
+        </button>
+      )}
     </div>
   );
 }

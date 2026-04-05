@@ -2,9 +2,11 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { accountsApi } from '../api/client';
 import type { Account } from '../api/types';
+import { useAuth } from '../context/AuthContext';
 
 export default function AccountsPage() {
   const navigate = useNavigate();
+  const { editMode } = useAuth();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
@@ -70,7 +72,7 @@ export default function AccountsPage() {
         <h2 className="text-lg font-semibold text-gray-800">Loan Accounts</h2>
       </div>
 
-      {showAdd && (
+      {showAdd && editMode && (
         <form onSubmit={handleAdd} className="bg-white border border-gray-200 rounded-lg p-3 space-y-2">
           <input
             type="text" placeholder="Loan name (e.g. SBI Home Loan)" value={newName}
@@ -123,6 +125,7 @@ export default function AccountsPage() {
                 onDelete={handleDelete}
                 onClick={handleAccountClick}
                 colorClass="text-orange-600"
+                editMode={editMode}
               />
             ))
           )}
@@ -130,13 +133,15 @@ export default function AccountsPage() {
       </section>
 
       {/* Floating Action Button */}
-      <button
-        onClick={() => setShowAdd(true)}
-        className="fixed bottom-24 right-6 w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center text-3xl hover:bg-blue-700 transition-colors z-20"
-        aria-label="Add Loan Account"
-      >
-        +
-      </button>
+      {editMode && (
+        <button
+          onClick={() => setShowAdd(true)}
+          className="fixed bottom-24 right-6 w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center text-3xl hover:bg-blue-700 transition-colors z-20"
+          aria-label="Add Loan Account"
+        >
+          +
+        </button>
+      )}
     </div>
   );
 }
@@ -147,12 +152,14 @@ function AccountCard({
   onDelete,
   onClick,
   colorClass = 'text-green-600',
+  editMode = false,
 }: {
   account: Account;
   onToggle: (a: Account) => void;
   onDelete: (a: Account) => void;
   onClick: (a: Account) => void;
   colorClass?: string;
+  editMode?: boolean;
 }) {
   return (
     <div 
@@ -162,18 +169,20 @@ function AccountCard({
       <div className="flex justify-between items-center">
         <div className="flex items-center gap-2">
           <p className="font-medium text-gray-800 text-sm">{account.name}</p>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete(account);
-            }}
-            className="text-gray-300 hover:text-red-500 transition-colors p-1"
-            title="Delete Account"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
-          </button>
+          {editMode && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(account);
+              }}
+              className="text-gray-300 hover:text-red-500 transition-colors p-1"
+              title="Delete Account"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
+          )}
         </div>
         <p className={`font-semibold ${colorClass}`}>
           Outstanding: ₹{account.current_balance.toLocaleString('en-IN')}

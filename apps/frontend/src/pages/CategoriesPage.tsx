@@ -3,12 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { categoriesApi } from '../api/client';
 import type { Category, EntityType, TxNature } from '../api/types';
 import { ENTITIES } from '../api/types';
+import { useAuth } from '../context/AuthContext';
 
 const STORAGE_ENTITY_KEY = 'cat_filter_entity';
 const STORAGE_NATURE_KEY = 'cat_filter_nature';
 
 export default function CategoriesPage() {
   const navigate = useNavigate();
+  const { editMode } = useAuth();
   const [selectedEntity, setSelectedEntity] = useState<EntityType>(
     () => (sessionStorage.getItem(STORAGE_ENTITY_KEY) as EntityType) || 'PERSONAL'
   );
@@ -113,15 +115,19 @@ export default function CategoriesPage() {
               <div className="flex justify-between items-center px-4 py-3 bg-gray-50 border-b border-gray-100">
                 <span className="font-bold text-gray-800 text-sm italic">{cat.name}</span>
                 <div className="flex gap-3">
-                  <button
-                    onClick={() => handleAddSub(cat.id)}
-                    className="text-xs bg-blue-50 text-blue-600 px-2.5 py-1 rounded-md font-semibold border border-blue-100"
-                  >
-                    + Sub
-                  </button>
-                  <button onClick={() => deleteCategory(cat.id)} className="text-xs text-red-500 font-medium">
-                    Delete
-                  </button>
+                  {editMode && (
+                    <button
+                      onClick={() => handleAddSub(cat.id)}
+                      className="text-xs bg-blue-50 text-blue-600 px-2.5 py-1 rounded-md font-semibold border border-blue-100"
+                    >
+                      + Sub
+                    </button>
+                  )}
+                  {editMode && (
+                    <button onClick={() => deleteCategory(cat.id)} className="text-xs text-red-500 font-medium">
+                      Delete
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -133,9 +139,11 @@ export default function CategoriesPage() {
                   (cat.sub_categories ?? []).map((sc) => (
                     <div key={sc.id} className="flex justify-between items-center px-5 py-2.5 hover:bg-gray-50 transition-colors">
                       <span className="text-sm text-gray-600 font-medium">{sc.name}</span>
-                      <button onClick={() => deleteSubCategory(cat.id, sc.id)} className="text-red-300 hover:text-red-500 transition-colors p-1">
-                        ✕
-                      </button>
+                      {editMode && (
+                        <button onClick={() => deleteSubCategory(cat.id, sc.id)} className="text-red-300 hover:text-red-500 transition-colors p-1">
+                          ✕
+                        </button>
+                      )}
                     </div>
                   ))
                 )}
@@ -175,12 +183,14 @@ export default function CategoriesPage() {
       )}
 
       {/* Floating Action Button */}
-      <button
-        onClick={() => navigate('/categories/new', { state: { entity: selectedEntity, nature: selectedNature } })}
-        className="fixed bottom-20 right-6 w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center text-3xl hover:bg-blue-700 transition-all active:scale-95 z-40"
-      >
-        +
-      </button>
+      {editMode && (
+        <button
+          onClick={() => navigate('/categories/new', { state: { entity: selectedEntity, nature: selectedNature } })}
+          className="fixed bottom-20 right-6 w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center text-3xl hover:bg-blue-700 transition-all active:scale-95 z-40"
+        >
+          +
+        </button>
+      )}
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom';
+import { useState, useRef, useEffect } from 'react';
 import TransactionsPage from './pages/TransactionsPage';
 import AddTransactionPage from './pages/AddTransactionPage';
 import AccountsPage from './pages/AccountsPage';
@@ -43,7 +44,24 @@ export default function App() {
 }
 
 function AppShell() {
-  const { isAuthenticated, logout, user } = useAuth();
+  const { isAuthenticated, logout, user, editMode, setEditMode } = useAuth();
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setShowUserMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const initials = user?.username
+    ? user.username.slice(0, 2).toUpperCase()
+    : '?';
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
@@ -51,13 +69,47 @@ function AppShell() {
         <h1 className="text-lg font-bold text-gray-800">FinTrack</h1>
         {isAuthenticated && (
           <div className="flex items-center gap-3">
-            <span className="text-sm text-gray-600">Hi, {user?.username}</span>
-            <button
-              onClick={logout}
-              className="text-sm text-red-600 hover:underline"
-            >
-              Logout
-            </button>
+            {/* Edit mode toggle */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-gray-500">Edit</span>
+              <button
+                onClick={() => setEditMode(!editMode)}
+                className={`relative w-9 h-5 rounded-full transition-colors duration-200 focus:outline-none ${
+                  editMode ? 'bg-blue-600' : 'bg-gray-300'
+                }`}
+                aria-label="Toggle edit mode"
+              >
+                <span
+                  className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${
+                    editMode ? 'translate-x-4' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* User avatar with dropdown */}
+            <div className="relative" ref={menuRef}>
+              <button
+                onClick={() => setShowUserMenu((v) => !v)}
+                className="w-8 h-8 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-1"
+              >
+                {initials}
+              </button>
+              {showUserMenu && (
+                <div className="absolute right-0 mt-2 w-36 bg-white border border-gray-200 rounded-lg shadow-lg z-50 overflow-hidden">
+                  <div className="px-3 py-2 border-b border-gray-100">
+                    <p className="text-xs text-gray-500">Signed in as</p>
+                    <p className="text-xs font-semibold text-gray-800 truncate">{user?.username}</p>
+                  </div>
+                  <button
+                    onClick={() => { setShowUserMenu(false); logout(); }}
+                    className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                  >
+                    Logout
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </header>

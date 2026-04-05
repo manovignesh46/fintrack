@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { transactionsApi } from '../api/client';
 import type { Transaction, EntityType, TxNature } from '../api/types';
 import { ENTITIES } from '../api/types';
+import { useAuth } from '../context/AuthContext';
 
 const natureColors: Record<TxNature, string> = {
   INCOME: 'text-green-600',
@@ -27,6 +28,7 @@ export default function TransactionsPage() {
   const [loading, setLoading] = useState(true);
   const [showExportOptions, setShowExportOptions] = useState(false);
   const navigate = useNavigate();
+  const { editMode } = useAuth();
 
   const load = async () => {
     setLoading(true);
@@ -202,20 +204,22 @@ export default function TransactionsPage() {
                   <p className={`font-semibold ${natureColors[t.nature]}`}>
                     {(t.nature === 'INCOME' || t.nature === 'LOAN_DISBURSEMENT') ? '+' : '-'}₹{t.amount.toLocaleString('en-IN')}
                   </p>
-                  <div className="flex gap-1 mt-1 justify-end">
-                    <button
-                      onClick={() => navigate(`/edit/${t.id}`)}
-                      className="text-xs text-blue-500 hover:underline"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDelete(t.id)}
-                      className="text-xs text-red-500 hover:underline"
-                    >
-                      Del
-                    </button>
-                  </div>
+                  {editMode && (
+                    <div className="flex gap-1 mt-1 justify-end">
+                      <button
+                        onClick={() => navigate(`/edit/${t.id}`)}
+                        className="text-xs text-blue-500 hover:underline"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDelete(t.id)}
+                        className="text-xs text-red-500 hover:underline"
+                      >
+                        Del
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

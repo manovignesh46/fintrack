@@ -8,6 +8,8 @@ interface AuthContextType {
   logout: () => void;
   isAuthenticated: boolean;
   loading: boolean;
+  editMode: boolean;
+  setEditMode: (v: boolean) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -16,6 +18,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [editMode, setEditMode] = useState(false);
 
   useEffect(() => {
     const savedToken = localStorage.getItem('fintrack_token');
@@ -51,6 +54,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         logout,
         isAuthenticated: !!token,
         loading,
+        editMode,
+        setEditMode,
       }}
     >
       {children}
